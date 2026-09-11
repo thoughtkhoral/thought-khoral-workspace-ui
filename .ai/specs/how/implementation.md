@@ -29,6 +29,14 @@ The MVP pins exact direct dependency versions so installs are reproducible. Meta
 
 PatternFly base CSS is imported before the app and ChatBot CSS is imported last, as required by their package installation guidance. Browser execution targets modern browsers supported by Vite 8 and PatternFly 6. The lockfile is the source of truth for transitive package versions and license review after installation.
 
+## Production ChatBot module contract
+
+The production preview must execute and render the normalized-event ChatBot stream, not merely compile it. A regression in the initial Task 5 build produced a blank page at the static preview URL and `TypeError: d is not a function` while initializing the generated `ChatStream` asset. The generated call crossed a manually configured Rolldown chunk boundary; it did not originate in room data or decision state.
+
+The installed `@patternfly/chatbot` 6.7.1 package is authoritative for the supported API. Its `dist/dynamic/Chatbot` entry exposes the Chatbot component as the default export and `ChatbotDisplayMode` as a named runtime export, while the component-specific dynamic entries expose `ChatbotContent`, `ChatbotFooter`, `Message`, `MessageBar`, and `MessageBox` as defaults. The package's installed examples use those same dynamic imports and `ChatbotDisplayMode.embedded`. The UI will retain that supported API and let Vite manage the interdependent ChatBot and markdown module graph instead of forcing those internals into custom code-splitting groups.
+
+A static-preview smoke check must build the application and execute the emitted `ChatStream` module in a browser-like DOM, followed by a real React render of the room conversation. Together these checks guard production module initialization and component rendering that the original source-only decision tests could not cover.
+
 ## Authenticated browser transport boundary
 
 `RoomPage` accepts `getAccessToken` and an authenticated `createSocket(url, accessToken)` adapter from its OIDC-enabled host. The hook acquires a fresh token before each connection attempt and never persists, logs, renders, or places it in a URL. A native browser `WebSocket` cannot set an `Authorization` header, so the host adapter and deployment edge must establish the gateway-compatible authenticated upgrade (for example through a same-origin session or a narrowly scoped WebSocket ticket). Task 8 must exercise that adapter against the live gateway; the UI does not invent an incompatible query-token convention.

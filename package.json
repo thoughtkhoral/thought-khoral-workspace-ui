@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:preview": "node static-preview-smoke.mjs && vitest run src/features/room/ChatStream.test.tsx"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",
