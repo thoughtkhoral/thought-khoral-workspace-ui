@@ -35,7 +35,7 @@ The production preview must execute and render the normalized-event ChatBot stre
 
 The installed `@patternfly/chatbot` 6.7.1 package is authoritative for the supported API. Its `dist/dynamic/Chatbot` entry exposes the Chatbot component as the default export and `ChatbotDisplayMode` as a named runtime export, while the component-specific dynamic entries expose `ChatbotContent`, `ChatbotFooter`, `Message`, `MessageBar`, and `MessageBox` as defaults. The package's installed examples use those same dynamic imports and `ChatbotDisplayMode.embedded`. The UI will retain that supported API and let Vite manage the interdependent ChatBot and markdown module graph instead of forcing those internals into custom code-splitting groups.
 
-A static-preview smoke check must build the application and execute the emitted `ChatStream` module in a browser-like DOM, followed by a real React render of the room conversation. Together these checks guard production module initialization and component rendering that the original source-only decision tests could not cover.
+A static-preview smoke check must build the application, install a host bootstrap value, load the emitted Vite application entry in a browser-like DOM, follow its lazy import, and wait for a visible `Room conversation`. A focused source component test remains useful, but it does not substitute for this entry-to-lazy-chunk production path. Together these checks guard production module initialization and component rendering that the original source-only decision tests could not cover.
 
 ## Authenticated browser transport boundary
 
