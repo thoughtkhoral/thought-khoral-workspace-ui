@@ -1,14 +1,15 @@
-import { readdir } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 
 import { JSDOM } from 'jsdom';
 import { build } from 'vite';
 
 await build({ logLevel: 'silent' });
 
-const dom = new JSDOM(
-  '<!doctype html><html><body><div id="root"></div></body></html>',
-  { url: 'http://127.0.0.1:4173/' },
+const builtDocument = await readFile(
+  new URL('./dist/index.html', import.meta.url),
+  'utf8',
 );
+const dom = new JSDOM(builtDocument, { url: 'http://127.0.0.1:4173/' });
 
 const { window } = dom;
 Object.assign(globalThis, {
@@ -75,7 +76,7 @@ class PreviewSocket extends window.EventTarget {
   send() {}
 }
 
-window.n2nWorkspace = {
+window.thoughtKhoralWorkspace = {
   roomId: 'room-preview-smoke',
   participantRole: 'human',
   getAccessToken: async () => 'preview-smoke-token',
@@ -117,17 +118,35 @@ while (!conversation && !runtimeError && Date.now() < deadline) {
   }
 }
 
-const conversationStyle = conversation
-  ? window.getComputedStyle(conversation)
-  : undefined;
-const isVisible =
-  conversation &&
-  !conversation.hidden &&
-  conversation.getAttribute('aria-hidden') !== 'true' &&
-  conversationStyle?.display !== 'none' &&
-  conversationStyle?.visibility !== 'hidden';
+const workspaceHeading = [...document.querySelectorAll('h1')].find((heading) =>
+  heading.textContent?.includes('ThoughtKhoral'),
+);
 
-if (!isVisible) {
+const isElementVisible = (element) => {
+  const style = element ? window.getComputedStyle(element) : undefined;
+  return Boolean(
+    element &&
+      !element.hidden &&
+      element.getAttribute('aria-hidden') !== 'true' &&
+      style?.display !== 'none' &&
+      style?.visibility !== 'hidden',
+  );
+};
+
+if (!document.title.includes('ThoughtKhoral')) {
+  console.error(
+    `The production preview document title is not ThoughtKhoral-branded: ${document.title}`,
+  );
+  process.exitCode = 1;
+}
+
+if (!isElementVisible(workspaceHeading)) {
+  console.error('The production preview did not render a visible ThoughtKhoral heading.');
+  console.error(`Preview DOM: ${document.body.innerHTML}`);
+  process.exitCode = 1;
+}
+
+if (!isElementVisible(conversation)) {
   console.error('The production preview did not render a visible Room conversation.');
   console.error(`Preview DOM: ${document.body.innerHTML}`);
   process.exitCode = 1;

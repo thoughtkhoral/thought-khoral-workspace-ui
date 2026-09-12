@@ -12,7 +12,7 @@ import '@patternfly/chatbot/dist/css/main.css';
 
 declare global {
   interface Window {
-    n2nWorkspace?: {
+    thoughtKhoralWorkspace?: {
       roomId: string;
       participantRole: ParticipantRole;
       getAccessToken: () => Promise<string>;
@@ -27,7 +27,7 @@ if (!rootElement) {
   throw new Error('The workspace root element is unavailable.');
 }
 
-const bootstrap = window.n2nWorkspace;
+const bootstrap = window.thoughtKhoralWorkspace;
 createRoot(rootElement).render(
   <StrictMode>
     <Suspense

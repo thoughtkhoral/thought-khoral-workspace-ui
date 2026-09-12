@@ -6,6 +6,8 @@ Implementation begins only after the relevant task is approved. The UI renders n
 
 The accepted local [ThoughtKhoral identity decision](../decisions/002-thoughtkhoral-identity.md) renames this project to `thought-khoral-workspace-ui`. The `n2n.room.v1` wire value remains unchanged; database and persisted values are outside this identity migration.
 
+The npm package is named `thought-khoral-workspace-ui`, and the host supplies the existing authentication and socket adapters through `window.thoughtKhoralWorkspace`. Production HTML, visible headings, and accessibility labels use ThoughtKhoral display text. The production-preview smoke check loads the built HTML and requires the ThoughtKhoral document title and workspace heading after bootstrap while continuing to exercise the emitted application entry and lazy ChatBot chunk.
+
 ## Approved implementation stack
 
 The MVP pins exact direct dependency versions so installs are reproducible. Metadata was checked against the authoritative npm registry on 2026-09-11 before implementation. This repository's Node.js 25.5.0 satisfies every selected tool's engine range.
@@ -37,7 +39,7 @@ The production preview must execute and render the normalized-event ChatBot stre
 
 The installed `@patternfly/chatbot` 6.7.1 package is authoritative for the supported API. Its `dist/dynamic/Chatbot` entry exposes the Chatbot component as the default export and `ChatbotDisplayMode` as a named runtime export, while the component-specific dynamic entries expose `ChatbotContent`, `ChatbotFooter`, `Message`, `MessageBar`, and `MessageBox` as defaults. The package's installed examples use those same dynamic imports and `ChatbotDisplayMode.embedded`. The UI will retain that supported API and let Vite manage the interdependent ChatBot and markdown module graph instead of forcing those internals into custom code-splitting groups.
 
-A static-preview smoke check must build the application, install a host bootstrap value, load the emitted Vite application entry in a browser-like DOM, follow its lazy import, and wait for a visible `Room conversation`. A focused source component test remains useful, but it does not substitute for this entry-to-lazy-chunk production path. Together these checks guard production module initialization and component rendering that the original source-only decision tests could not cover.
+A static-preview smoke check must build the application, install a `thoughtKhoralWorkspace` host bootstrap value, load the built HTML and emitted Vite application entry in a browser-like DOM, follow its lazy import, and wait for a visible ThoughtKhoral heading and `Room conversation`. A focused source component test remains useful, but it does not substitute for this entry-to-lazy-chunk production path. Together these checks guard production module initialization, product identity, and component rendering that the original source-only decision tests could not cover.
 
 ## Authenticated browser transport boundary
 

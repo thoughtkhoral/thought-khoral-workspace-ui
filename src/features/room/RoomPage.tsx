@@ -57,14 +57,14 @@ export function RoomPage({
     <Masthead>
       <MastheadMain>
         <MastheadBrand>
-          <Title headingLevel="h1">N:N collaborative room</Title>
+          <Title headingLevel="h1">ThoughtKhoral collaborative room</Title>
         </MastheadBrand>
       </MastheadMain>
     </Masthead>
   );
 
   return (
-    <Page masthead={masthead} mainAriaLabel="N:N room workspace">
+    <Page masthead={masthead} mainAriaLabel="ThoughtKhoral room workspace">
       <MemoryDrawer
         decisions={room.decisions}
         isExpanded={isMemoryExpanded}
