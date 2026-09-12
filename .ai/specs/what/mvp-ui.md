@@ -2,7 +2,7 @@
 
 ## Sole MVP responsibility
 
-`n2n-workspace-ui` renders the governed room experience and gives human participants the controls to confirm, edit, or dismiss draft decisions.
+`thought-khoral-workspace-ui` renders the governed room experience and gives human participants the controls to confirm, edit, or dismiss draft decisions.
 
 ## Acceptance criteria
 
