@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-This repository implements root [Decision 003 — ThoughtKhoral product identity](../../../../.ai/specs/decisions/003-thoughtkhoral-product-identity.md). Its direct-child directory is renamed exactly from `n2n-workspace-ui` to `thought-khoral-workspace-ui`.
+This repository implements root [Decision 003 — ThoughtKhoral product identity](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/003-thoughtkhoral-product-identity.md). Its direct-child directory is renamed exactly from `n2n-workspace-ui` to `thought-khoral-workspace-ui`.
 
 Active project identity uses `ThoughtKhoral` in visible browser copy and `thought-khoral-workspace-ui` in package metadata. The browser host bootstrap namespace is `thoughtKhoralWorkspace`; this namespace change does not alter its token callback, authenticated socket adapter, or the adapter's `session.authenticate` behavior.
 
