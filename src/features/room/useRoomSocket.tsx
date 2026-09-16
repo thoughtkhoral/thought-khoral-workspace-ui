@@ -3,9 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createRpcRequest,
   isRoomEvent,
+  isParticipantUpdate,
+  projectRoomParticipants,
   readGatewayError,
+  readParticipants,
   type GatewayError,
   type RoomEvent,
+  type RoomParticipant,
   type RpcRequest,
 } from '../../api';
 
@@ -45,6 +49,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function mergeEventParticipants(
+  current: readonly RoomParticipant[],
+  events: readonly RoomEvent[],
+): RoomParticipant[] {
+  const participants = new Map(current.map((participant) => [participant.id, participant]));
+  for (const participant of projectRoomParticipants(events)) {
+    const prior = participants.get(participant.id);
+    participants.set(participant.id, {
+      ...participant,
+      online: prior?.online ?? false,
+    });
+  }
+  return [...participants.values()];
+}
+
 export function useRoomSocket({
   roomId,
   getAccessToken,
@@ -53,6 +72,7 @@ export function useRoomSocket({
   reconnectDelayMs = 1_000,
 }: UseRoomSocketOptions) {
   const [events, setEvents] = useState<RoomEvent[]>([]);
+  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [error, setError] = useState<GatewayError | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [lastSequence, setLastSequence] = useState(0);
@@ -74,6 +94,7 @@ export function useRoomSocket({
       lastSequenceRef.current = newestSequence;
       setLastSequence(newestSequence);
       setEvents((current) => [...current, ...normalized]);
+      setParticipants((current) => mergeEventParticipants(current, normalized));
     },
     [roomId],
   );
@@ -134,12 +155,22 @@ export function useRoomSocket({
             appendEvents([value]);
             return;
           }
+          if (isParticipantUpdate(value)) {
+            if (value.params.roomId === roomId) {
+              setParticipants(value.params.participants);
+            }
+            return;
+          }
           if (
             isRecord(value) &&
             isRecord(value.result) &&
             Array.isArray(value.result.events)
           ) {
             appendEvents(value.result.events);
+            const joinedParticipants = readParticipants(value.result.participants);
+            if (joinedParticipants) {
+              setParticipants(joinedParticipants);
+            }
           }
         };
         const onClose: EventListener = () => {
@@ -201,5 +232,5 @@ export function useRoomSocket({
     [roomId],
   );
 
-  return { events, error, status, lastSequence, send };
+  return { events, participants, error, status, lastSequence, send };
 }

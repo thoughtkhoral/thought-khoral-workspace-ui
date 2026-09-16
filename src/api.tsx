@@ -11,6 +11,19 @@ export type RoomEventType =
   | 'decision.edited'
   | 'decision.dismissed';
 
+export interface RoomActor {
+  id: string;
+  role: ParticipantRole;
+  displayName?: string;
+}
+
+export interface RoomParticipant {
+  id: string;
+  role: ParticipantRole;
+  displayName: string;
+  online: boolean;
+}
+
 export interface RoomEvent {
   contractVersion: typeof CONTRACT_VERSION;
   requestId: string;
@@ -19,7 +32,7 @@ export interface RoomEvent {
   sequence: number;
   eventId: string;
   eventType: RoomEventType;
-  actor: { id: string; role: ParticipantRole };
+  actor: RoomActor;
   payload: Record<string, unknown>;
 }
 
@@ -33,6 +46,17 @@ export interface RoomMessage {
 export interface RoomProjection {
   messages: RoomMessage[];
   decisions: Decision[];
+  participants: RoomParticipant[];
+}
+
+export interface RoomParticipantUpdate {
+  jsonrpc: '2.0';
+  method: 'room.participants.updated';
+  params: {
+    contractVersion: typeof CONTRACT_VERSION;
+    roomId: string;
+    participants: RoomParticipant[];
+  };
 }
 
 export interface GatewayError {
@@ -82,6 +106,16 @@ export function isRoomEvent(value: unknown): value is RoomEvent {
     return false;
   }
 
+  const displayName = value.actor.displayName;
+  if (
+    displayName !== undefined &&
+    (typeof displayName !== 'string' ||
+      displayName.length === 0 ||
+      displayName.length > 128)
+  ) {
+    return false;
+  }
+
   return (
     value.contractVersion === CONTRACT_VERSION &&
     typeof value.requestId === 'string' &&
@@ -95,6 +129,42 @@ export function isRoomEvent(value: unknown): value is RoomEvent {
     typeof value.actor.id === 'string' &&
     (value.actor.role === 'human' || value.actor.role === 'agent')
   );
+}
+
+function isParticipant(value: unknown): value is RoomParticipant {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    (value.role === 'human' || value.role === 'agent') &&
+    typeof value.displayName === 'string' &&
+    value.displayName.length > 0 &&
+    value.displayName.length <= 128 &&
+    typeof value.online === 'boolean'
+  );
+}
+
+export function isParticipantUpdate(
+  value: unknown,
+): value is RoomParticipantUpdate {
+  if (!isRecord(value) || !isRecord(value.params)) {
+    return false;
+  }
+
+  return (
+    value.jsonrpc === '2.0' &&
+    value.method === 'room.participants.updated' &&
+    value.params.contractVersion === CONTRACT_VERSION &&
+    typeof value.params.roomId === 'string' &&
+    Array.isArray(value.params.participants) &&
+    value.params.participants.every(isParticipant)
+  );
+}
+
+export function readParticipants(value: unknown): RoomParticipant[] | null {
+  if (!Array.isArray(value) || !value.every(isParticipant)) {
+    return null;
+  }
+  return value;
 }
 
 export function readGatewayError(value: unknown): GatewayError | null {
@@ -163,6 +233,27 @@ function readStringArray(value: unknown): string[] | null {
     : null;
 }
 
+function fallbackDisplayName(actor: RoomActor): string {
+  return `${actor.role === 'human' ? 'Human' : 'Agent'} ${actor.id.slice(0, 8)}`;
+}
+
+export function projectRoomParticipants(
+  events: readonly RoomEvent[],
+): RoomParticipant[] {
+  const participants = new Map<string, RoomParticipant>();
+  for (const event of [...events].sort(
+    (left, right) => left.sequence - right.sequence,
+  )) {
+    participants.set(event.actor.id, {
+      id: event.actor.id,
+      role: event.actor.role,
+      displayName: event.actor.displayName ?? fallbackDisplayName(event.actor),
+      online: false,
+    });
+  }
+  return [...participants.values()];
+}
+
 export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection {
   const messages: RoomMessage[] = [];
   const decisions = new Map<string, Decision>();
@@ -220,5 +311,9 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
     });
   }
 
-  return { messages, decisions: [...decisions.values()] };
+  return {
+    messages,
+    decisions: [...decisions.values()],
+    participants: projectRoomParticipants(events),
+  };
 }

@@ -38,9 +38,10 @@ export function ChatStream({
               role={message.actor.role === 'human' ? 'user' : 'bot'}
               alignment={message.actor.role === 'human' ? 'end' : 'start'}
               name={
-                message.actor.role === 'human'
+                message.actor.displayName ??
+                (message.actor.role === 'human'
                   ? 'Human participant'
-                  : 'Agent participant'
+                  : 'Agent participant')
               }
               content={message.text}
               timestamp={message.occurredAt}

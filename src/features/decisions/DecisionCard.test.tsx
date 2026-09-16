@@ -263,9 +263,104 @@ describe('useRoomSocket', () => {
     expect(replayJoin.params.afterSequence).toBe(5);
     unmount();
   });
+
+  it('projects join participants and applies live presence updates', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const { result } = renderHook(() =>
+      useRoomSocket({
+        roomId: 'room-1',
+        getAccessToken: async () => 'opaque-access-token',
+        createSocket,
+      }),
+    );
+
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+    act(() =>
+      socket.receive({
+        jsonrpc: '2.0',
+        id: 'join-response',
+        result: {
+          events: [],
+          participants: [
+            {
+              id: 'actor-1',
+              role: 'human',
+              displayName: 'Maya Chen',
+              online: true,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(result.current.participants).toEqual([
+      {
+        id: 'actor-1',
+        role: 'human',
+        displayName: 'Maya Chen',
+        online: true,
+      },
+    ]);
+
+    act(() =>
+      socket.receive({
+        jsonrpc: '2.0',
+        method: 'room.participants.updated',
+        params: {
+          contractVersion: 'n2n.room.v1',
+          roomId: 'room-1',
+          participants: [
+            {
+              id: 'actor-1',
+              role: 'human',
+              displayName: 'Maya Chen',
+              online: false,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(result.current.participants[0]?.online).toBe(false);
+  });
 });
 
 describe('RoomPage governance', () => {
+  it('opens the participant roster with named room actors', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+
+    render(
+      <RoomPage
+        roomId="room-1"
+        participantRole="human"
+        getAccessToken={async () => 'opaque-access-token'}
+        createSocket={createSocket}
+      />,
+    );
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+    act(() =>
+      socket.receive({
+        contractVersion: 'n2n.room.v1',
+        requestId: 'request-1',
+        roomId: 'room-1',
+        occurredAt: '2026-09-15T12:00:00Z',
+        sequence: 1,
+        eventId: 'event-1',
+        eventType: 'message.created',
+        actor: { id: 'actor-1', role: 'human', displayName: 'Maya Chen' },
+        payload: { text: 'Hello' },
+      }),
+    );
+
+    expect(screen.getAllByText('Maya Chen')).toHaveLength(2);
+    expect(screen.getByText('Offline')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Close participants' })).toBeTruthy();
+  });
+
   it('waits for a normalized confirmation before showing active memory', async () => {
     const socket = new FakeRoomSocket();
     const createSocket = vi.fn(() => socket);
