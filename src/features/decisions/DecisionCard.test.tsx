@@ -27,6 +27,7 @@ const draftDecision = {
   sourceEventIds: ['event-7', 'event-11'],
   status: 'draft' as const,
 };
+const validRoomId = '10000000-0000-4000-8000-000000000001';
 
 describe('DecisionCard', () => {
   it('lets a human confirm a draft decision', async () => {
@@ -183,6 +184,7 @@ describe('normalized room events', () => {
 
 class FakeRoomSocket extends EventTarget implements RoomWebSocket {
   readonly sent: string[] = [];
+  closeCount = 0;
   readyState: number = WebSocket.CONNECTING;
 
   open() {
@@ -201,6 +203,7 @@ class FakeRoomSocket extends EventTarget implements RoomWebSocket {
   }
 
   close() {
+    this.closeCount += 1;
     this.readyState = WebSocket.CLOSED;
   }
 }
@@ -328,9 +331,26 @@ describe('useRoomSocket', () => {
 });
 
 describe('RoomPage governance', () => {
-  it('opens the participant roster with named room actors', async () => {
-    const socket = new FakeRoomSocket();
-    const createSocket = vi.fn(() => socket);
+  it('does not connect or render conversation until a room is explicitly entered', () => {
+    const createSocket = vi.fn(() => new FakeRoomSocket());
+
+    render(
+      <RoomPage
+        roomId={validRoomId}
+        participantRole="human"
+        getAccessToken={async () => 'opaque-access-token'}
+        createSocket={createSocket}
+      />,
+    );
+
+    expect(createSocket).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Enter room' })).toBeTruthy();
+    expect(screen.queryByText('Decisions')).toBeNull();
+  });
+
+  it('rejects a non-UUID room ID before opening the socket', async () => {
+    const createSocket = vi.fn(() => new FakeRoomSocket());
+    const user = userEvent.setup();
 
     render(
       <RoomPage
@@ -340,13 +360,95 @@ describe('RoomPage governance', () => {
         createSocket={createSocket}
       />,
     );
+
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
+
+    expect(screen.getByText('Enter a valid room ID (UUID).')).toBeTruthy();
+    expect(createSocket).not.toHaveBeenCalled();
+  });
+
+  it('enters the suggested room only after explicit confirmation', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const onEnterRoom = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <RoomPage
+        {...({
+          roomId: validRoomId,
+          participantRole: 'human',
+          getAccessToken: async () => 'opaque-access-token',
+          createSocket,
+          onEnterRoom,
+        } as any)}
+      />
+    );
+
+    expect(createSocket).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+
+    expect(JSON.parse(socket.sent[0]!).method).toBe('room.join');
+    expect(JSON.parse(socket.sent[0]!).params.roomId).toBe(validRoomId);
+    expect(onEnterRoom).toHaveBeenCalledWith(validRoomId);
+  });
+
+  it('leaves the room, cancels reconnect, and returns to the unjoined state', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const onLeaveRoom = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <RoomPage
+        {...({
+          roomId: validRoomId,
+          participantRole: 'human',
+          getAccessToken: async () => 'opaque-access-token',
+          createSocket,
+          onLeaveRoom,
+        } as any)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+    act(() => socket.dispatchEvent(new Event('close')));
+
+    await user.click(screen.getByRole('button', { name: 'Leave room' }));
+    expect(socket.closeCount).toBeGreaterThan(0);
+    expect(onLeaveRoom).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Enter room' })).toBeTruthy();
+    expect(screen.queryByText('Decisions')).toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(createSocket).toHaveBeenCalledOnce();
+  });
+
+  it('opens the participant roster with named room actors', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const user = userEvent.setup();
+
+    render(
+      <RoomPage
+        roomId={validRoomId}
+        participantRole="human"
+        getAccessToken={async () => 'opaque-access-token'}
+        createSocket={createSocket}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
     await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
     act(() => socket.open());
     act(() =>
       socket.receive({
         contractVersion: 'n2n.room.v1',
         requestId: 'request-1',
-        roomId: 'room-1',
+        roomId: validRoomId,
         occurredAt: '2026-09-15T12:00:00Z',
         sequence: 1,
         eventId: 'event-1',
@@ -369,19 +471,20 @@ describe('RoomPage governance', () => {
 
     render(
       <RoomPage
-        roomId="room-1"
+        roomId={validRoomId}
         participantRole="human"
         getAccessToken={getAccessToken}
         createSocket={createSocket}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
     await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
     act(() => socket.open());
     act(() =>
       socket.receive({
         contractVersion: 'n2n.room.v1',
         requestId: 'request-1',
-        roomId: 'room-1',
+        roomId: validRoomId,
         occurredAt: '2026-09-11T12:00:00Z',
         sequence: 1,
         eventId: 'event-1',
@@ -415,7 +518,7 @@ describe('RoomPage governance', () => {
       socket.receive({
         contractVersion: 'n2n.room.v1',
         requestId: 'request-2',
-        roomId: 'room-1',
+        roomId: validRoomId,
         occurredAt: '2026-09-11T12:01:00Z',
         sequence: 2,
         eventId: 'event-2',

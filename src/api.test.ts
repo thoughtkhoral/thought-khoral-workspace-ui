@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CONTRACT_VERSION,
   isParticipantUpdate,
   projectRoomEvents,
   type RoomEvent,
 } from './api';
 
 const messageEvent: RoomEvent = {
-  contractVersion: 'n2n.room.v1',
+  contractVersion: CONTRACT_VERSION,
   requestId: 'request-1',
   roomId: 'room-1',
   occurredAt: '2026-09-15T12:00:00Z',
@@ -42,7 +43,7 @@ describe('room participant projection', () => {
         jsonrpc: '2.0',
         method: 'room.participants.updated',
         params: {
-          contractVersion: 'n2n.room.v1',
+          contractVersion: CONTRACT_VERSION,
           roomId: 'room-1',
           participants: [
             {

@@ -13,11 +13,13 @@ import '@patternfly/chatbot/dist/css/main.css';
 declare global {
   interface Window {
     thoughtKhoralWorkspace?: {
-      roomId: string;
+      roomId?: string;
       participantRole: ParticipantRole;
       getAccessToken: () => Promise<string>;
       createSocket: AuthenticatedSocketFactory;
       socketUrl?: string;
+      onEnterRoom?: (roomId: string) => void;
+      onLeaveRoom?: () => void;
     };
   }
 }

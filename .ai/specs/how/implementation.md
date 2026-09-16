@@ -4,6 +4,34 @@ Follow the [root MVP foundation implementation plan](https://github.com/thoughtk
 
 Implementation begins only after the relevant task is approved. The UI renders normalized gateway events and preserves the server-enforced human approval boundary in its controls.
 
+## Explicit room lifecycle
+
+`RoomPage` owns an unjoined/joined state boundary. It may receive an optional
+`roomId` suggestion from `window.thoughtKhoralWorkspace`, but it must not pass
+that suggestion to `useRoomSocket` until the human confirms it through the
+PatternFly entry control. Only that confirmation may begin `getAccessToken`,
+the host's `session.authenticate` exchange, and `room.join`.
+
+When the human chooses Leave, `RoomPage` clears its active room ID. The socket
+hook closes the current socket, cancels any reconnect timer and pending
+connection continuation, resets events/participants/sequence/error state, and
+returns `disconnected`. The UI then renders only the room-entry state; it does
+not show the old transcript as an active session. A revisit after tab close
+follows the same unjoined path even when OIDC SSO can authenticate without a
+password form.
+
+The host contract is:
+
+```ts
+roomId?: string;
+onEnterRoom?: (roomId: string) => void;
+onLeaveRoom?: () => void;
+```
+
+These callbacks may update a non-secret room URL binding, but must not clear or
+log OIDC tokens. The UI does not add `room.leave`, durable membership, kick,
+history deletion, or any client-side authoritative event persistence.
+
 The accepted local [ThoughtKhoral identity decision](../decisions/002-thoughtkhoral-identity.md) renames this project to `thought-khoral-workspace-ui`. The `n2n.room.v1` wire value remains unchanged; database and persisted values are outside this identity migration.
 
 The npm package is named `thought-khoral-workspace-ui`, and the host supplies the existing authentication and socket adapters through `window.thoughtKhoralWorkspace`. Production HTML, visible headings, and accessibility labels use ThoughtKhoral display text. The production-preview smoke check loads the built HTML and requires the ThoughtKhoral document title and workspace heading after bootstrap while continuing to exercise the emitted application entry and lazy ChatBot chunk.

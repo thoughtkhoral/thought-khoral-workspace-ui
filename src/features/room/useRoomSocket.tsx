@@ -27,7 +27,7 @@ export type AuthenticatedSocketFactory = (
 ) => RoomWebSocket;
 
 export interface UseRoomSocketOptions {
-  roomId: string;
+  roomId?: string;
   getAccessToken: () => Promise<string>;
   createSocket: AuthenticatedSocketFactory;
   url?: string;
@@ -74,10 +74,21 @@ export function useRoomSocket({
   const [events, setEvents] = useState<RoomEvent[]>([]);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [error, setError] = useState<GatewayError | null>(null);
-  const [status, setStatus] = useState<ConnectionStatus>('connecting');
+  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [lastSequence, setLastSequence] = useState(0);
   const socketRef = useRef<RoomWebSocket | null>(null);
   const lastSequenceRef = useRef(0);
+
+  useEffect(() => {
+    setEvents([]);
+    setParticipants([]);
+    setError(null);
+    setLastSequence(0);
+    lastSequenceRef.current = 0;
+    if (!roomId) {
+      setStatus('disconnected');
+    }
+  }, [roomId]);
 
   const appendEvents = useCallback(
     (received: unknown[]) => {
@@ -103,6 +114,19 @@ export function useRoomSocket({
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let hasConnected = false;
+
+    if (!roomId) {
+      socketRef.current?.close();
+      socketRef.current = null;
+      return () => {
+        cancelled = true;
+        if (reconnectTimer !== undefined) {
+          clearTimeout(reconnectTimer);
+        }
+        socketRef.current?.close();
+        socketRef.current = null;
+      };
+    }
 
     const connect = async () => {
       setStatus(hasConnected ? 'reconnecting' : 'connecting');
@@ -219,7 +243,7 @@ export function useRoomSocket({
       params: Record<string, unknown>,
     ) => {
       const socket = socketRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
+      if (!roomId || !socket || socket.readyState !== WebSocket.OPEN) {
         setError({
           code: -32603,
           message: 'The gateway could not complete the request.',

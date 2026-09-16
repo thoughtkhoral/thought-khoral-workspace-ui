@@ -77,7 +77,7 @@ class PreviewSocket extends window.EventTarget {
 }
 
 window.thoughtKhoralWorkspace = {
-  roomId: 'room-preview-smoke',
+  roomId: '10000000-0000-4000-8000-000000000001',
   participantRole: 'human',
   getAccessToken: async () => 'preview-smoke-token',
   createSocket: () => new PreviewSocket(),
@@ -111,6 +111,21 @@ try {
 
 const deadline = Date.now() + 2_000;
 let conversation;
+let enterRoomButton;
+while (!enterRoomButton && !runtimeError && Date.now() < deadline) {
+  enterRoomButton = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Enter room',
+  );
+  if (!enterRoomButton) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+if (!enterRoomButton) {
+  throw new Error('The production preview did not render the room entry action.');
+}
+enterRoomButton.dispatchEvent(
+  new window.MouseEvent('click', { bubbles: true, cancelable: true }),
+);
 while (!conversation && !runtimeError && Date.now() < deadline) {
   conversation = document.querySelector('[aria-label="Room conversation"]');
   if (!conversation) {
