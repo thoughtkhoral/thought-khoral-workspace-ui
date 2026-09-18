@@ -24,6 +24,20 @@ the authenticated gateway and the local platform's OIDC configuration; the UI
 does not own identity validation, persistence, or authoritative decision
 transitions.
 
+## Message mentions and delivery
+
+In a connected room, type `@` in the message composer to select known human or
+agent participants. The fixed aliases `@allhumans` and `@allagents` are always
+available. Manually typed unknown or stale tokens disable Send rather than
+creating a message for an unknown participant.
+
+Choose **Everyone in room** for the default room-wide message, or **Mentioned
+participants only** to deliver to the resolved mention audience and yourself.
+`@allhumans` reaches human participants; `@allagents` reaches agents and is
+also visible to all humans. The composer supports up to 50 unique targets and
+renders delivered mentions and targeted-delivery labels accessibly in the
+transcript.
+
 See the [local specification index](.ai/specs/README.md) and the
 [repository map](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/repository-map.md).
 
