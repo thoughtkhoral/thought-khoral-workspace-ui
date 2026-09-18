@@ -1,4 +1,4 @@
-import { lazy, useMemo, useState, type FormEvent } from 'react';
+import { lazy, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Button,
   Content,
@@ -21,8 +21,11 @@ import {
   Title,
 } from '@patternfly/react-core';
 
-import { GatewayErrorAlert, projectRoomEvents } from '../../api';
+import { GatewayErrorAlert, projectRoomEvents, type RoomEvent } from '../../api';
 import { DecisionCard } from '../decisions/DecisionCard';
+import { DecisionCommandDialog } from '../decisions/DecisionCommandDialog';
+import type { DecisionCreateValues } from '../decisions/DecisionCreateForm';
+import type { DecisionEditTransition } from '../decisions/DecisionEditForm';
 import { MemoryDrawer } from '../decisions/MemoryDrawer';
 import { ParticipantDrawer } from '../participants/ParticipantDrawer';
 import {
@@ -60,6 +63,18 @@ export function RoomPage({
   const [roomInput, setRoomInput] = useState(roomId ?? '');
   const [activeRoomId, setActiveRoomId] = useState<string>();
   const [didValidateRoom, setDidValidateRoom] = useState(false);
+  const [isDecisionDialogOpen, setIsDecisionDialogOpen] = useState(false);
+  const pendingMutations = useRef(
+    new Map<
+      string,
+      {
+        kind: 'create' | 'update' | 'delete';
+        title?: string;
+        edited?: boolean;
+        confirmed?: boolean;
+      }
+    >(),
+  );
   const { events, participants, error, status, send } = useRoomSocket({
     roomId: activeRoomId,
     getAccessToken,
@@ -70,6 +85,54 @@ export function RoomPage({
   const roomParticipants =
     participants.length > 0 ? participants : room.participants;
   const isConnected = status === 'connected';
+  const canManageDecisions = participantRole === 'human';
+
+  const rememberMutation = (
+    requestId: string | false,
+    mutation: {
+      kind: 'create' | 'update' | 'delete';
+      title?: string;
+    },
+  ) => {
+    if (requestId !== false) {
+      pendingMutations.current.set(requestId, mutation);
+    }
+  };
+
+  const sendDecisionUpdate = (transition: DecisionEditTransition) => {
+    const requestId = send('decision.transition', {
+      decisionId: transition.decisionId,
+      action: transition.action,
+      editedTitle: transition.editedTitle,
+      editedSummary: transition.editedSummary,
+    });
+    rememberMutation(requestId, { kind: 'update', title: transition.editedTitle });
+  };
+
+  useEffect(() => {
+    for (const event of events as RoomEvent[]) {
+      const pending = pendingMutations.current.get(event.requestId);
+      if (!pending) continue;
+      let complete = false;
+      if (pending.kind === 'create' && event.eventType === 'decision.proposed') {
+        complete = true;
+      } else if (pending.kind === 'delete' && event.eventType === 'decision.deleted') {
+        complete = true;
+      } else if (pending.kind === 'update') {
+        pending.edited ||= event.eventType === 'decision.edited';
+        pending.confirmed ||= event.eventType === 'decision.confirmed';
+        complete = Boolean(pending.edited && pending.confirmed);
+      }
+      if (!complete) continue;
+      pendingMutations.current.delete(event.requestId);
+      const label = pending.kind === 'create'
+        ? 'Created decision'
+        : pending.kind === 'update'
+          ? 'Updated decision'
+          : 'Deleted decision';
+      send('chat.send', { text: `${label}: ${pending.title ?? 'decision'}.` });
+    }
+  }, [events, send]);
 
   const enterRoom = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -179,6 +242,8 @@ export function RoomPage({
                   <ChatStream
                     messages={room.messages}
                     isConnected={isConnected}
+                    canManageDecisions={canManageDecisions}
+                    onCommand={() => setIsDecisionDialogOpen(true)}
                     onSendMessage={(text) => send('chat.send', { text })}
                   />
                 </StackItem>
@@ -196,19 +261,14 @@ export function RoomPage({
                         decision={decision}
                         participantRole={participantRole}
                         onTransition={(transition) => {
-                          const params =
-                            transition.action === 'edit'
-                              ? {
-                                  decisionId: transition.decisionId,
-                                  action: transition.action,
-                                  editedTitle: transition.editedTitle,
-                                  editedSummary: transition.editedSummary,
-                                }
-                              : {
-                                  decisionId: transition.decisionId,
-                                  action: transition.action,
-                                };
-                          send('decision.transition', params);
+                          if (transition.action === 'edit') {
+                            sendDecisionUpdate(transition);
+                            return;
+                          }
+                          send('decision.transition', {
+                            decisionId: transition.decisionId,
+                            action: transition.action,
+                          });
                         }}
                       />
                     </StackItem>
@@ -216,6 +276,22 @@ export function RoomPage({
                 )}
               </Stack>
             </PageSection>
+            <DecisionCommandDialog
+              isOpen={isDecisionDialogOpen}
+              decisions={room.decisions}
+              messages={room.messages}
+              onCreate={(values: DecisionCreateValues) => {
+                const requestId = send('decision.propose', { ...values });
+                rememberMutation(requestId, { kind: 'create', title: values.title });
+              }}
+              onUpdate={sendDecisionUpdate}
+              onDelete={(decisionId) => {
+                const decision = room.decisions.find((candidate) => candidate.id === decisionId);
+                const requestId = send('decision.delete', { decisionId });
+                rememberMutation(requestId, { kind: 'delete', title: decision?.title });
+              }}
+              onCancel={() => setIsDecisionDialogOpen(false)}
+            />
           </MemoryDrawer>
         </ParticipantDrawer>
       ) : (

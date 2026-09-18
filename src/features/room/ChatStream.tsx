@@ -13,12 +13,16 @@ import './ChatStream.css';
 export interface ChatStreamProps {
   messages: readonly RoomMessage[];
   onSendMessage: (text: string) => void;
+  onCommand?: (command: 'decisions') => void;
+  canManageDecisions?: boolean;
   isConnected: boolean;
 }
 
 export function ChatStream({
   messages,
   onSendMessage,
+  onCommand,
+  canManageDecisions = false,
   isConnected,
 }: ChatStreamProps) {
   return (
@@ -62,7 +66,11 @@ export function ChatStream({
           onSendMessage={(value) => {
             const text = String(value).trim();
             if (text) {
-              onSendMessage(text);
+              if (text === '/decisions' && canManageDecisions && onCommand) {
+                onCommand('decisions');
+              } else {
+                onSendMessage(text);
+              }
             }
           }}
         />
