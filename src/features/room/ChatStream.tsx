@@ -6,6 +6,8 @@ import ChatbotFooter from '@patternfly/chatbot/dist/dynamic/ChatbotFooter';
 import Message from '@patternfly/chatbot/dist/dynamic/Message';
 import MessageBar from '@patternfly/chatbot/dist/dynamic/MessageBar';
 import MessageBox from '@patternfly/chatbot/dist/dynamic/MessageBox';
+import { Alert } from '@patternfly/react-core';
+import { useState } from 'react';
 
 import type { RoomMessage } from '../../api';
 import './ChatStream.css';
@@ -25,6 +27,32 @@ export function ChatStream({
   canManageDecisions = false,
   isConnected,
 }: ChatStreamProps) {
+  const [commandError, setCommandError] = useState<string | null>(null);
+
+  const submitMessage = (value: unknown) => {
+    const text = String(value).trim();
+    if (!text) return;
+
+    if (text.startsWith('/')) {
+      if (text === '/decisions') {
+        if (canManageDecisions && onCommand) {
+          setCommandError(null);
+          onCommand('decisions');
+        } else {
+          setCommandError(
+            'Decision commands are available to human participants only.',
+          );
+        }
+        return;
+      }
+      setCommandError('Unknown command. Try /decisions.');
+      return;
+    }
+
+    setCommandError(null);
+    onSendMessage(text);
+  };
+
   return (
     <Chatbot
       displayMode={ChatbotDisplayMode.embedded}
@@ -57,22 +85,23 @@ export function ChatStream({
         </MessageBox>
       </ChatbotContent>
       <ChatbotFooter>
+        {commandError && (
+          <Alert
+            variant="warning"
+            isInline
+            title="Command not recognized"
+            role="alert"
+          >
+            {commandError}
+          </Alert>
+        )}
         <MessageBar
           aria-label="Message"
           placeholder={
             isConnected ? 'Send a room message' : 'Waiting for the room'
           }
           isDisabled={!isConnected}
-          onSendMessage={(value) => {
-            const text = String(value).trim();
-            if (text) {
-              if (text === '/decisions' && canManageDecisions && onCommand) {
-                onCommand('decisions');
-              } else {
-                onSendMessage(text);
-              }
-            }
-          }}
+          onSendMessage={submitMessage}
         />
       </ChatbotFooter>
     </Chatbot>
