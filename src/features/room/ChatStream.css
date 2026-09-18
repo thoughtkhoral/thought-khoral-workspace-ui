@@ -1,0 +1,9 @@
+.thought-khoral-room-chatbot.pf-chatbot--embedded
+  .pf-chatbot__content {
+  justify-content: stretch;
+}
+
+.thought-khoral-room-chatbot.pf-chatbot--embedded
+  .pf-chatbot__messagebox {
+  max-width: none;
+}

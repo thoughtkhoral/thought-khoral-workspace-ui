@@ -8,6 +8,7 @@ import MessageBar from '@patternfly/chatbot/dist/dynamic/MessageBar';
 import MessageBox from '@patternfly/chatbot/dist/dynamic/MessageBox';
 
 import type { RoomMessage } from '../../api';
+import './ChatStream.css';
 
 export interface ChatStreamProps {
   messages: readonly RoomMessage[];
@@ -24,6 +25,7 @@ export function ChatStream({
     <Chatbot
       displayMode={ChatbotDisplayMode.embedded}
       ariaLabel="Room conversation"
+      className="thought-khoral-room-chatbot"
     >
       <ChatbotContent>
         <MessageBox

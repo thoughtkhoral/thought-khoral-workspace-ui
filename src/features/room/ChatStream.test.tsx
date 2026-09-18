@@ -24,6 +24,11 @@ describe('ChatStream', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Room conversation')).toBeTruthy();
+    const conversation = screen.getByLabelText('Room conversation');
+
+    expect(conversation).toBeTruthy();
+    expect(conversation.parentElement?.className).toContain(
+      'thought-khoral-room-chatbot',
+    );
   });
 });
