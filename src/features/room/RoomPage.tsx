@@ -241,10 +241,11 @@ export function RoomPage({
                 <StackItem isFilled>
                   <ChatStream
                     messages={room.messages}
+                    participants={roomParticipants}
                     isConnected={isConnected}
                     canManageDecisions={canManageDecisions}
                     onCommand={() => setIsDecisionDialogOpen(true)}
-                    onSendMessage={(text) => send('chat.send', { text })}
+                    onSendMessage={(values) => send('chat.send', { ...values })}
                   />
                 </StackItem>
                 <StackItem>

@@ -4,17 +4,18 @@ import Chatbot, {
 import ChatbotContent from '@patternfly/chatbot/dist/dynamic/ChatbotContent';
 import ChatbotFooter from '@patternfly/chatbot/dist/dynamic/ChatbotFooter';
 import Message from '@patternfly/chatbot/dist/dynamic/Message';
-import MessageBar from '@patternfly/chatbot/dist/dynamic/MessageBar';
 import MessageBox from '@patternfly/chatbot/dist/dynamic/MessageBox';
 import { Alert, AlertActionCloseButton } from '@patternfly/react-core';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import type { RoomMessage } from '../../api';
+import type { ChatMention, ChatSendValues, RoomMessage, RoomParticipant } from '../../api';
 import './ChatStream.css';
+import { MentionComposer } from './MentionComposer';
 
 export interface ChatStreamProps {
   messages: readonly RoomMessage[];
-  onSendMessage: (text: string) => void;
+  participants: readonly RoomParticipant[];
+  onSendMessage: (values: ChatSendValues) => void;
   onCommand?: (command: 'decisions') => void;
   canManageDecisions?: boolean;
   isConnected: boolean;
@@ -22,6 +23,7 @@ export interface ChatStreamProps {
 
 export function ChatStream({
   messages,
+  participants,
   onSendMessage,
   onCommand,
   canManageDecisions = false,
@@ -29,8 +31,8 @@ export function ChatStream({
 }: ChatStreamProps) {
   const [commandError, setCommandError] = useState<string | null>(null);
 
-  const submitMessage = (value: unknown) => {
-    const text = String(value).trim();
+  const submitMessage = (values: ChatSendValues) => {
+    const text = values.text;
     if (!text) return;
 
     if (text.startsWith('/')) {
@@ -48,7 +50,42 @@ export function ChatStream({
       return;
     }
 
-    onSendMessage(text);
+    onSendMessage(values);
+  };
+
+  const mentionLabel = (mention: ChatMention) => {
+    if (mention.type === 'alias') {
+      return mention.alias === 'allhumans' ? 'Mention all humans' : 'Mention all agents';
+    }
+    const participant = participants.find((candidate) => candidate.id === mention.id);
+    return participant
+      ? `Mention ${participant.displayName}, ${participant.role} participant`
+      : `Mention participant ${mention.token}`;
+  };
+
+  const messageContent = (message: RoomMessage) => {
+    const mentions = new Map<string, ChatMention>();
+    for (const mention of message.mentions) {
+      mentions.set(mention.type === 'participant' ? mention.token : mention.alias, mention);
+    }
+    const pattern = /@([a-z0-9]+(?:-[a-z0-9]+)*)/gi;
+    const fragments: ReactNode[] = [];
+    let end = 0;
+    for (const match of message.text.matchAll(pattern)) {
+      const token = match[1].toLowerCase();
+      const mention = mentions.get(token);
+      if (!mention) continue;
+      const start = match.index ?? 0;
+      fragments.push(message.text.slice(end, start));
+      fragments.push(
+        <span className="thought-khoral-transcript-mention" aria-label={mentionLabel(mention)} key={`${start}-${token}`}>
+          {match[0]}
+        </span>,
+      );
+      end = start + match[0].length;
+    }
+    fragments.push(message.text.slice(end));
+    return <>{fragments}</>;
   };
 
   return (
@@ -75,10 +112,14 @@ export function ChatStream({
                   ? 'Human participant'
                   : 'Agent participant')
               }
-              content={message.text}
-              timestamp={message.occurredAt}
-              isMarkdownDisabled
-            />
+              >
+                <>
+                  {messageContent(message)}
+                  {message.delivery === 'mentioned' && (
+                    <span className="thought-khoral-targeted-delivery">Mentioned participants only</span>
+                  )}
+                </>
+              </Message>
           ))}
         </MessageBox>
       </ChatbotContent>
@@ -99,14 +140,7 @@ export function ChatStream({
             {commandError}
           </Alert>
         )}
-        <MessageBar
-          aria-label="Message"
-          placeholder={
-            isConnected ? 'Send a room message' : 'Waiting for the room'
-          }
-          isDisabled={!isConnected}
-          onSendMessage={submitMessage}
-        />
+        <MentionComposer participants={participants} isConnected={isConnected} onSend={submitMessage} />
       </ChatbotFooter>
     </Chatbot>
   );
