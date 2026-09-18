@@ -17,6 +17,7 @@ import {
   DecisionCreateForm,
   type DecisionCreateValues,
 } from './DecisionCreateForm';
+import './DecisionCommandDialog.css';
 
 type DialogAction = 'create' | 'update' | 'delete';
 
@@ -61,85 +62,115 @@ export function DecisionCommandDialog({
     <Modal
       isOpen={isOpen}
       variant={ModalVariant.medium}
-      title="Decision actions"
+      title="Manage decisions"
       onClose={onCancel}
-      aria-label="Decision actions"
+      aria-label="Manage decisions"
+      className="decision-command-dialog"
     >
-      {!action && (
-        <>
-          <Content component="p">Choose an action for the room decisions.</Content>
-          <Button onClick={() => setAction('create')}>Create</Button>{' '}
-          <Button
-            variant="secondary"
-            isDisabled={drafts.length === 0}
-            onClick={() => setAction('update')}
-          >
-            Update draft
-          </Button>{' '}
-          <Button
-            variant="danger"
-            isDisabled={decisions.length === 0}
-            onClick={() => setAction('delete')}
-          >
-            Delete
-          </Button>{' '}
-          <Button variant="link" onClick={onCancel}>
-            Cancel
-          </Button>
-        </>
-      )}
-      {action === 'create' && (
-        <DecisionCreateForm
-          messages={messages}
-          onSubmit={(values) => closeAfter(() => onCreate(values))}
-          onCancel={onCancel}
-        />
-      )}
-      {action === 'update' && !selected && (
-        <>
-          <Title headingLevel="h3">Choose a draft decision</Title>
-          {drafts.map((decision) => (
-            <div key={decision.id}>
-              <Button variant="link" onClick={() => setSelectedId(decision.id)}>
-                {decision.title}
+      <div className="decision-command-dialog__content">
+        {!action && (
+          <>
+            <Title headingLevel="h2">Manage decisions</Title>
+            <Content component="p">
+              Choose what you want to do with the room’s decisions.
+            </Content>
+            <div className="decision-command-dialog__actions">
+              <button
+                type="button"
+                className="decision-command-dialog__action"
+                aria-label="Create"
+                onClick={() => setAction('create')}
+              >
+                <span className="decision-command-dialog__action-title">Create</span>
+                <span className="decision-command-dialog__action-description">
+                  Add a new draft decision.
+                </span>
+              </button>
+              <button
+                type="button"
+                className="decision-command-dialog__action"
+                aria-label="Update draft"
+                disabled={drafts.length === 0}
+                onClick={() => setAction('update')}
+              >
+                <span className="decision-command-dialog__action-title">Update draft</span>
+                <span className="decision-command-dialog__action-description">
+                  Edit an existing draft.
+                </span>
+              </button>
+              <button
+                type="button"
+                className="decision-command-dialog__action decision-command-dialog__action--danger"
+                aria-label="Delete"
+                disabled={decisions.length === 0}
+                onClick={() => setAction('delete')}
+              >
+                <span className="decision-command-dialog__action-title">Delete</span>
+                <span className="decision-command-dialog__action-description">
+                  Permanently remove a decision.
+                </span>
+              </button>
+            </div>
+            <div className="decision-command-dialog__footer">
+              <Button variant="link" onClick={onCancel}>
+                Cancel
               </Button>
             </div>
-          ))}
-          <Button variant="link" onClick={onCancel}>Cancel</Button>
-        </>
-      )}
-      {action === 'update' && selected && (
-        <DecisionEditForm
-          decision={selected}
-          onSubmit={(transition) => closeAfter(() => onUpdate(transition))}
-          onCancel={onCancel}
-        />
-      )}
-      {action === 'delete' && !selected && (
-        <>
-          <Title headingLevel="h3">Choose a decision to delete</Title>
-          {decisions.map((decision) => (
-            <div key={decision.id}>
-              <Button variant="link" onClick={() => setSelectedId(decision.id)}>
-                {decision.title} ({decision.status})
-              </Button>
-            </div>
-          ))}
-          <Button variant="link" onClick={onCancel}>Cancel</Button>
-        </>
-      )}
-      {action === 'delete' && selected && (
-        <>
-          <Content component="p">
-            Permanently delete “{selected.title}”? This removes the decision from
-            the current decision list while retaining an audit event.
-          </Content>
-          <Button variant="danger" onClick={() => closeAfter(() => onDelete(selected.id))}>
-            Permanently delete
-          </Button>{' '}
-          <Button variant="link" onClick={onCancel}>Cancel</Button>
-        </>
-      )}
+          </>
+        )}
+        {action === 'create' && (
+          <DecisionCreateForm
+            messages={messages}
+            onSubmit={(values) => closeAfter(() => onCreate(values))}
+            onCancel={onCancel}
+          />
+        )}
+        {action === 'update' && !selected && (
+          <>
+            <Title headingLevel="h3">Choose a draft decision</Title>
+            {drafts.map((decision) => (
+              <div key={decision.id}>
+                <Button variant="link" onClick={() => setSelectedId(decision.id)}>
+                  {decision.title}
+                </Button>
+              </div>
+            ))}
+            <Button variant="link" onClick={onCancel}>Cancel</Button>
+          </>
+        )}
+        {action === 'update' && selected && (
+          <DecisionEditForm
+            decision={selected}
+            onSubmit={(transition) => closeAfter(() => onUpdate(transition))}
+            onCancel={onCancel}
+          />
+        )}
+        {action === 'delete' && !selected && (
+          <>
+            <Title headingLevel="h3">Choose a decision to delete</Title>
+            {decisions.map((decision) => (
+              <div key={decision.id}>
+                <Button variant="link" onClick={() => setSelectedId(decision.id)}>
+                  {decision.title} ({decision.status})
+                </Button>
+              </div>
+            ))}
+            <Button variant="link" onClick={onCancel}>Cancel</Button>
+          </>
+        )}
+        {action === 'delete' && selected && (
+          <>
+            <Content component="p">
+              Permanently delete “{selected.title}”? This removes the decision from
+              the current decision list while retaining an audit event.
+            </Content>
+            <Button variant="danger" onClick={() => closeAfter(() => onDelete(selected.id))}>
+              Permanently delete
+            </Button>{' '}
+            <Button variant="link" onClick={onCancel}>Cancel</Button>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }

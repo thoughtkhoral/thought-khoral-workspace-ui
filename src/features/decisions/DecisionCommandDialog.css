@@ -1,0 +1,71 @@
+.decision-command-dialog {
+  width: min(36rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+}
+
+.decision-command-dialog__content {
+  box-sizing: border-box;
+  padding: 0.5rem 1rem 1rem;
+}
+
+.decision-command-dialog__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.decision-command-dialog__action {
+  display: flex;
+  min-height: 6.5rem;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  border: 1px solid var(--pf-t--global--border--color--default, #d2d2d2);
+  border-radius: 0.5rem;
+  background: var(--pf-t--global--background--color--primary--default, #fff);
+  color: var(--pf-t--global--text--color--regular, #151515);
+  cursor: pointer;
+  padding: 1rem;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.decision-command-dialog__action:hover,
+.decision-command-dialog__action:focus-visible {
+  border-color: var(--pf-t--global--color--brand--default, #0066cc);
+  box-shadow: 0 0 0 2px rgb(0 102 204 / 18%);
+  outline: none;
+}
+
+.decision-command-dialog__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.decision-command-dialog__action--danger {
+  border-color: var(--pf-t--global--color--status--danger--default, #c9190b);
+}
+
+.decision-command-dialog__action-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.decision-command-dialog__action-description {
+  color: var(--pf-t--global--text--color--subtle, #6a6e73);
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.decision-command-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+@media (max-width: 42rem) {
+  .decision-command-dialog__actions {
+    grid-template-columns: 1fr;
+  }
+}

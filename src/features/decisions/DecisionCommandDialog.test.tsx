@@ -59,6 +59,28 @@ describe('DecisionCommandDialog', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
+  it('presents compact inset action cards with clear descriptions', () => {
+    render(
+      <DecisionCommandDialog
+        isOpen
+        decisions={[]}
+        messages={[]}
+        onCreate={() => undefined}
+        onUpdate={() => undefined}
+        onDelete={() => undefined}
+        onCancel={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Manage decisions' })).toBeTruthy();
+    expect(screen.getByText('Add a new draft decision.')).toBeTruthy();
+    expect(screen.getByText('Edit an existing draft.')).toBeTruthy();
+    expect(screen.getByText('Permanently remove a decision.')).toBeTruthy();
+    expect(
+      screen.getByRole('dialog').querySelector('.decision-command-dialog__content'),
+    ).toBeTruthy();
+  });
+
   it('limits update to drafts and requires delete confirmation', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
