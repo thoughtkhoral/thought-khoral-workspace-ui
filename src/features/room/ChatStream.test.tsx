@@ -57,7 +57,7 @@ describe('ChatStream', () => {
     expect(onSendMessage).not.toHaveBeenCalled();
   });
 
-  it('passes ordinary messages through and does not expose the command to agents', async () => {
+  it('passes ordinary messages through and rejects decision commands for agents', async () => {
     const user = userEvent.setup();
     const onCommand = vi.fn();
     const onSendMessage = vi.fn();
@@ -73,14 +73,44 @@ describe('ChatStream', () => {
     const input = container.querySelector<HTMLTextAreaElement>(
       'textarea[aria-label="Message"]',
     )!;
-    await user.type(input, '/decisions please');
+    await user.type(input, 'ordinary room message');
     await user.keyboard('{Enter}');
     await user.clear(input);
     await user.type(input, '/decisions');
     await user.keyboard('{Enter}');
 
     expect(onCommand).not.toHaveBeenCalled();
-    expect(onSendMessage).toHaveBeenNthCalledWith(1, '/decisions please');
-    expect(onSendMessage).toHaveBeenNthCalledWith(2, '/decisions');
+    expect(onSendMessage).toHaveBeenCalledWith('ordinary room message');
+    expect(onSendMessage).toHaveBeenCalledOnce();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'Decision commands are available to human participants only.',
+    );
+  });
+
+  it('rejects unknown slash commands without sending them to the room', async () => {
+    const user = userEvent.setup();
+    const onCommand = vi.fn();
+    const onSendMessage = vi.fn();
+    const { container } = render(
+      <ChatStream
+        isConnected
+        messages={[]}
+        onCommand={onCommand}
+        canManageDecisions
+        onSendMessage={onSendMessage}
+      />,
+    );
+
+    const input = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Message"]',
+    )!;
+    await user.type(input, '/unknown');
+    await user.keyboard('{Enter}');
+
+    expect(onCommand).not.toHaveBeenCalled();
+    expect(onSendMessage).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'Unknown command. Try /decisions.',
+    );
   });
 });
