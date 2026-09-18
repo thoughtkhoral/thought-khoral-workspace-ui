@@ -149,6 +149,36 @@ describe('chat message metadata projection', () => {
     ]);
   });
 
+  it('accepts a one-word participant token allowed by the contract', () => {
+    const room = projectRoomEvents([
+      {
+        ...messageEvent,
+        payload: {
+          text: 'Please review this, @maya.',
+          mentions: [
+            {
+              type: 'participant',
+              id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+              token: 'maya',
+            },
+          ],
+          delivery: 'mentioned',
+        },
+      },
+    ]);
+
+    expect(room.messages[0]).toMatchObject({
+      mentions: [
+        {
+          type: 'participant',
+          id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+          token: 'maya',
+        },
+      ],
+      delivery: 'mentioned',
+    });
+  });
+
   it('defaults legacy chat messages without metadata to room delivery', () => {
     const room = projectRoomEvents([messageEvent]);
 

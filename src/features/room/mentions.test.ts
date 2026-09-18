@@ -41,6 +41,12 @@ describe('participantToken', () => {
     expect(participantToken(colliding[0], colliding)).toBe('maya-chen-f4c0ffee');
     expect(participantToken(colliding[1], colliding)).toBe('maya-chen-c0ffee00');
   });
+
+  it('keeps a unique one-word display-name slug unchanged', () => {
+    const singleWord = { ...participants[0], displayName: 'Maya' };
+
+    expect(participantToken(singleWord, [singleWord])).toBe('maya');
+  });
 });
 
 describe('mentionOptions', () => {
@@ -58,6 +64,42 @@ describe('mentionOptions', () => {
       },
       { type: 'alias', alias: 'allhumans', token: 'allhumans' },
       { type: 'alias', alias: 'allagents', token: 'allagents' },
+    ]);
+  });
+
+  it('disambiguates participant names reserved by group aliases', () => {
+    const reserved = [
+      { ...participants[0], displayName: 'allhumans' },
+      { ...participants[1], displayName: 'allagents' },
+    ];
+
+    expect(mentionOptions(reserved).map((option) => option.token)).toEqual([
+      'allhumans-f4c0ffee',
+      'allagents-c0ffee00',
+      'allhumans',
+      'allagents',
+    ]);
+  });
+
+  it('extends shared eight-character UUID prefixes to keep every participant token unique', () => {
+    const sharedPrefix = [
+      {
+        ...participants[0],
+        id: '12345678-aaaa-4567-8901-abcdef123456',
+        displayName: 'Maya Chen',
+      },
+      {
+        ...participants[1],
+        id: '12345678-bbbb-4567-8901-abcdef123456',
+        displayName: 'maya--chen',
+      },
+    ];
+
+    expect(mentionOptions(sharedPrefix).map((option) => option.token)).toEqual([
+      'maya-chen-12345678a',
+      'maya-chen-12345678b',
+      'allhumans',
+      'allagents',
     ]);
   });
 });
@@ -114,5 +156,19 @@ describe('unresolvedMentionTokens', () => {
       'Email maya@example.com; then ask @unknown!',
       mentionOptions(participants),
     )).toEqual(['@unknown']);
+  });
+
+  it('preserves duplicate textual unknown mentions in text order', () => {
+    expect(unresolvedMentionTokens(
+      '@former-user asked @former-user to review.',
+      mentionOptions(participants),
+    )).toEqual(['@former-user', '@former-user']);
+  });
+
+  it('accepts only complete valid tokens and excludes email-like text', () => {
+    expect(unresolvedMentionTokens(
+      'maya@example.com @maya- @maya--chen @maya-chen.extra @former-user',
+      mentionOptions(participants),
+    )).toEqual(['@former-user']);
   });
 });

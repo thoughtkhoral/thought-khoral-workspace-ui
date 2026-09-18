@@ -257,7 +257,7 @@ function readStringArray(value: unknown): string[] | null {
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const mentionTokenPattern = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
+const mentionTokenPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const maxChatMentions = 50;
 
 function isChatMention(value: unknown): value is ChatMention {
