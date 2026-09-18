@@ -18,6 +18,7 @@ export interface ActiveMentionQuery {
 }
 
 const aliasTokens = new Set(['allhumans', 'allagents']);
+const mentionTokenPattern = /@([a-z0-9]+(?:-[a-z0-9]+)*)/gi;
 
 function normalizedParticipantName(displayName: string): string {
   return (
@@ -142,6 +143,24 @@ function isMentionBoundary(value: string, atIndex: number): boolean {
   );
 }
 
+export interface MentionToken {
+  token: string;
+  start: number;
+  end: number;
+}
+
+export function mentionTokens(value: string): MentionToken[] {
+  const tokens: MentionToken[] = [];
+  for (const match of value.matchAll(mentionTokenPattern)) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    if (isMentionBoundary(value, start) && !/[a-z0-9.-]/i.test(value.charAt(end))) {
+      tokens.push({ token: match[1].toLowerCase(), start, end });
+    }
+  }
+  return tokens;
+}
+
 export function activeMentionQuery(
   value: string,
   cursor: number,
@@ -170,7 +189,11 @@ export function insertMention(
   }
 
   const replacement = `@${option.token}`;
-  const nextValue = `${value.slice(0, activeQuery.start)}${replacement}${value.slice(cursor)}`;
+  let end = cursor;
+  while (/[a-z0-9-]/i.test(value.charAt(end))) {
+    end += 1;
+  }
+  const nextValue = `${value.slice(0, activeQuery.start)}${replacement}${value.slice(end)}`;
   return {
     value: nextValue,
     cursor: activeQuery.start + replacement.length,
@@ -183,13 +206,9 @@ export function unresolvedMentionTokens(
 ): string[] {
   const knownTokens = new Set(options.map((option) => option.token));
   const unresolved: string[] = [];
-  const pattern = /@([a-z0-9]+(?:-[a-z0-9]+)*)(?![a-z0-9.-])/gi;
-
-  for (const match of value.matchAll(pattern)) {
-    const atIndex = match.index ?? 0;
-    const token = match[1];
-    if (isMentionBoundary(value, atIndex) && !knownTokens.has(token.toLowerCase())) {
-      unresolved.push(match[0]);
+  for (const mention of mentionTokens(value)) {
+    if (!knownTokens.has(mention.token)) {
+      unresolved.push(`@${mention.token}`);
     }
   }
 

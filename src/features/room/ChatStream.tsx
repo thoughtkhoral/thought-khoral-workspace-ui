@@ -11,6 +11,7 @@ import { useState, type ReactNode } from 'react';
 import type { ChatMention, ChatSendValues, RoomMessage, RoomParticipant } from '../../api';
 import './ChatStream.css';
 import { MentionComposer } from './MentionComposer';
+import { mentionTokens } from './mentions';
 
 export interface ChatStreamProps {
   messages: readonly RoomMessage[];
@@ -68,21 +69,18 @@ export function ChatStream({
     for (const mention of message.mentions) {
       mentions.set(mention.type === 'participant' ? mention.token : mention.alias, mention);
     }
-    const pattern = /@([a-z0-9]+(?:-[a-z0-9]+)*)/gi;
     const fragments: ReactNode[] = [];
     let end = 0;
-    for (const match of message.text.matchAll(pattern)) {
-      const token = match[1].toLowerCase();
-      const mention = mentions.get(token);
+    for (const token of mentionTokens(message.text)) {
+      const mention = mentions.get(token.token);
       if (!mention) continue;
-      const start = match.index ?? 0;
-      fragments.push(message.text.slice(end, start));
+      fragments.push(message.text.slice(end, token.start));
       fragments.push(
-        <span className="thought-khoral-transcript-mention" aria-label={mentionLabel(mention)} key={`${start}-${token}`}>
-          {match[0]}
+        <span className="thought-khoral-transcript-mention" aria-label={mentionLabel(mention)} key={`${token.start}-${token.token}`}>
+          {message.text.slice(token.start, token.end)}
         </span>,
       );
-      end = start + match[0].length;
+      end = token.end;
     }
     fragments.push(message.text.slice(end));
     return <>{fragments}</>;
@@ -112,6 +110,7 @@ export function ChatStream({
                   ? 'Human participant'
                   : 'Agent participant')
               }
+              timestamp={message.occurredAt}
               >
                 <>
                   {messageContent(message)}

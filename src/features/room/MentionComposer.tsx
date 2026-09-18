@@ -6,6 +6,7 @@ import type { ChatMention, ChatSendValues, RoomParticipant } from '../../api';
 import {
   activeMentionQuery,
   insertMention,
+  mentionTokens,
   mentionOptions,
   unresolvedMentionTokens,
   type MentionOption,
@@ -17,12 +18,15 @@ export interface MentionComposerProps {
   onSend: (values: ChatSendValues) => void;
 }
 
+const maxResolvedTargets = 50;
+const mentionSuggestionsId = 'mention-suggestions';
+
+function mentionOptionId(option: MentionOption): string {
+  return `mention-option-${option.token}`;
+}
+
 function selectedMentions(value: string, options: readonly MentionOption[]): ChatMention[] {
-  const usedTokens = new Set(
-    [...value.matchAll(/@([a-z0-9]+(?:-[a-z0-9]+)*)/gi)].map((match) =>
-      match[1].toLowerCase(),
-    ),
-  );
+  const usedTokens = new Set(mentionTokens(value).map((mention) => mention.token));
   const unique = new Set<string>();
   const mentions: ChatMention[] = [];
   for (const option of options) {
@@ -48,8 +52,9 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
     : [];
   const unresolved = unresolvedMentionTokens(text, options);
   const mentions = selectedMentions(text, options);
+  const exceedsTargetLimit = mentions.length > maxResolvedTargets;
   const cannotSend = !text.trim() || !isConnected || unresolved.length > 0 ||
-    (delivery === 'mentioned' && mentions.length === 0);
+    exceedsTargetLimit || (delivery === 'mentioned' && mentions.length === 0);
 
   const choose = (option: MentionOption) => {
     const inserted = insertMention(text, cursor, option);
@@ -114,9 +119,21 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
           Unknown mention token: {unresolved.join(', ')}
         </Alert>
       )}
+      {exceedsTargetLimit && (
+        <Alert variant="danger" isInline title="Too many mention targets" role="alert">
+          A message can include at most 50 unique mention targets.
+        </Alert>
+      )}
       <div className="thought-khoral-mention-input">
         <MessageBar
           aria-label="Message"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={suggestions.length > 0}
+          aria-controls={suggestions.length > 0 ? mentionSuggestionsId : undefined}
+          aria-activedescendant={suggestions.length > 0
+            ? mentionOptionId(suggestions[activeIndex] ?? suggestions[0]!)
+            : undefined}
           placeholder={isConnected ? 'Send a room message' : 'Waiting for the room'}
           hasAttachButton={false}
           alwayShowSendButton
@@ -142,10 +159,16 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
           onSendMessage={submit}
         />
         {suggestions.length > 0 && (
-          <ul className="thought-khoral-mention-menu" role="listbox" aria-label="Mention suggestions">
+          <ul
+            id={mentionSuggestionsId}
+            className="thought-khoral-mention-menu"
+            role="listbox"
+            aria-label="Mention suggestions"
+          >
             {suggestions.map((option, index) => (
               <li
                 key={option.token}
+                id={mentionOptionId(option)}
                 role="option"
                 aria-selected={index === activeIndex}
                 onMouseDown={(event) => event.preventDefault()}

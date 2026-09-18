@@ -4,6 +4,7 @@ import type { RoomParticipant } from '../../api';
 import {
   activeMentionQuery,
   insertMention,
+  mentionTokens,
   mentionOptions,
   participantToken,
   unresolvedMentionTokens,
@@ -133,6 +134,15 @@ describe('insertMention', () => {
     });
   });
 
+  it('replaces the entire active token when the cursor is in its middle', () => {
+    const option = mentionOptions(participants)[0];
+
+    expect(insertMention('@maya', 3, option)).toEqual({
+      value: '@maya-chen',
+      cursor: 10,
+    });
+  });
+
   it('leaves the value and cursor unchanged when no mention query is active', () => {
     const option = mentionOptions(participants)[0];
 
@@ -140,6 +150,14 @@ describe('insertMention', () => {
       value: 'Please ask Maya',
       cursor: 15,
     });
+  });
+});
+
+describe('mentionTokens', () => {
+  it('returns only complete tokens that start at mention boundaries', () => {
+    expect(mentionTokens('email@maya-chen @maya-chen.extra @maya-chen')).toEqual([
+      { token: 'maya-chen', start: 33, end: 43 },
+    ]);
   });
 });
 

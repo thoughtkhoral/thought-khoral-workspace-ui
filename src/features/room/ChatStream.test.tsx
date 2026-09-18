@@ -166,6 +166,74 @@ describe('ChatStream', () => {
     });
   });
 
+  it('does not add resolved targets from email-like or incomplete mention text', async () => {
+    const user = userEvent.setup();
+    const onSendMessage = vi.fn();
+    const { container } = render(
+      <ChatStream isConnected messages={[]} participants={participants} onSendMessage={onSendMessage} />,
+    );
+
+    await user.type(inputFor(container), 'email@maya-chen @maya-chen.extra');
+    await user.click(within(container).getByRole('button', { name: 'Send message' }));
+
+    expect(onSendMessage).toHaveBeenCalledWith({
+      text: 'email@maya-chen @maya-chen.extra',
+      mentions: [],
+      delivery: 'room',
+    });
+  });
+
+  it('associates the textarea with its active mention listbox', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ChatStream isConnected messages={[]} participants={participants} onSendMessage={() => undefined} />,
+    );
+
+    const input = inputFor(container);
+    await user.type(input, '@');
+
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(input.getAttribute('aria-controls')).toBe('mention-suggestions');
+    expect(input.getAttribute('aria-activedescendant')).toBe('mention-option-maya-chen');
+    expect(screen.getByRole('listbox', { name: 'Mention suggestions' }).id).toBe('mention-suggestions');
+    expect(screen.getByRole('option', { name: /@maya-chen/i }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('replaces a whole mention token when selecting from the middle of it', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ChatStream isConnected messages={[]} participants={participants} onSendMessage={() => undefined} />,
+    );
+
+    const input = inputFor(container);
+    await user.type(input, '@maya');
+    input.setSelectionRange(3, 3);
+    await user.keyboard('{Enter}');
+
+    expect(input.value).toBe('@maya-chen');
+  });
+
+  it('blocks sending when more than 50 unique targets are resolved', async () => {
+    const user = userEvent.setup();
+    const onSendMessage = vi.fn();
+    const manyParticipants = Array.from({ length: 51 }, (_, index) => ({
+      id: `participant-${index}`,
+      role: 'human' as const,
+      displayName: `Person ${index}`,
+      online: true,
+    }));
+    const { container } = render(
+      <ChatStream isConnected messages={[]} participants={manyParticipants} onSendMessage={onSendMessage} />,
+    );
+
+    await user.type(inputFor(container), manyParticipants.map((_, index) => `@person-${index}`).join(' '));
+
+    expect(within(container).getByRole('alert').textContent).toContain('50 unique mention targets');
+    expect((within(container).getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(true);
+    await user.click(within(container).getByRole('button', { name: 'Send message' }));
+    expect(onSendMessage).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['allhumans', 'allhumans'],
     ['allagents', 'allagents'],
@@ -248,6 +316,7 @@ describe('ChatStream', () => {
 
     expect(screen.getByLabelText('Mention Maya Chen, human participant').textContent).toBe('@maya-chen');
     expect(screen.getByLabelText('Mention all agents').textContent).toBe('@allagents');
+    expect(screen.getByText('2026-09-18T12:00:00Z')).toBeTruthy();
     expect(document.querySelector('.thought-khoral-targeted-delivery')?.textContent).toBe('Mentioned participants only');
     expect(document.querySelector('strong')).toBeNull();
     expect(document.body.textContent).toContain('<strong>unsafe</strong>');
