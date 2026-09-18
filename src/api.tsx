@@ -25,6 +25,18 @@ export interface RoomParticipant {
   online: boolean;
 }
 
+export type ChatDelivery = 'room' | 'mentioned';
+
+export type ChatMention =
+  | { type: 'participant'; id: string; token: string }
+  | { type: 'alias'; alias: 'allhumans' | 'allagents' };
+
+export interface ChatSendValues {
+  text: string;
+  mentions: ChatMention[];
+  delivery: ChatDelivery;
+}
+
 export interface RoomEvent {
   contractVersion: typeof CONTRACT_VERSION;
   requestId: string;
@@ -42,6 +54,8 @@ export interface RoomMessage {
   actor: RoomEvent['actor'];
   occurredAt: string;
   text: string;
+  mentions: ChatMention[];
+  delivery: ChatDelivery;
 }
 
 export interface RoomProjection {
@@ -102,6 +116,7 @@ const safeErrorMessages = new Map<number, string>([
   [-32010, 'This decision can no longer make that transition.'],
   [-32011, 'The collaboration context has expired.'],
   [-32012, 'A request identifier was reused with different content.'],
+  [-32013, 'The message mentions an unknown participant.'],
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -240,6 +255,29 @@ function readStringArray(value: unknown): string[] | null {
     : null;
 }
 
+function isChatMention(value: unknown): value is ChatMention {
+  if (!isRecord(value) || typeof value.type !== 'string') {
+    return false;
+  }
+
+  if (value.type === 'participant') {
+    return typeof value.id === 'string' && typeof value.token === 'string';
+  }
+
+  return (
+    value.type === 'alias' &&
+    (value.alias === 'allhumans' || value.alias === 'allagents')
+  );
+}
+
+function readChatMentions(value: unknown): ChatMention[] | null {
+  return Array.isArray(value) && value.every(isChatMention) ? value : null;
+}
+
+function readChatDelivery(value: unknown): ChatDelivery | null {
+  return value === 'room' || value === 'mentioned' ? value : null;
+}
+
 function fallbackDisplayName(actor: RoomActor): string {
   return `${actor.role === 'human' ? 'Human' : 'Agent'} ${actor.id.slice(0, 8)}`;
 }
@@ -276,6 +314,8 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
           actor: event.actor,
           occurredAt: event.occurredAt,
           text,
+          mentions: readChatMentions(event.payload.mentions) ?? [],
+          delivery: readChatDelivery(event.payload.delivery) ?? 'room',
         });
       }
       continue;

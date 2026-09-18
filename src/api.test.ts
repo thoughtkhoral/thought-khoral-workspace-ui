@@ -5,6 +5,7 @@ import {
   isRoomEvent,
   isParticipantUpdate,
   projectRoomEvents,
+  readGatewayError,
   type RoomEvent,
 } from './api';
 
@@ -106,5 +107,76 @@ describe('room decision projection', () => {
         },
       }),
     ).toBe(true);
+  });
+});
+
+describe('chat message metadata projection', () => {
+  it('projects valid mentions and mentioned delivery from a chat message', () => {
+    const room = projectRoomEvents([
+      {
+        ...messageEvent,
+        payload: {
+          text: 'Please review this, @Maya and @allagents.',
+          mentions: [
+            { type: 'participant', id: 'maya-1', token: '@Maya' },
+            { type: 'alias', alias: 'allagents' },
+          ],
+          delivery: 'mentioned',
+        },
+      },
+    ]);
+
+    expect(room.messages).toEqual([
+      {
+        eventId: 'event-1',
+        actor: messageEvent.actor,
+        occurredAt: '2026-09-15T12:00:00Z',
+        text: 'Please review this, @Maya and @allagents.',
+        mentions: [
+          { type: 'participant', id: 'maya-1', token: '@Maya' },
+          { type: 'alias', alias: 'allagents' },
+        ],
+        delivery: 'mentioned',
+      },
+    ]);
+  });
+
+  it('defaults legacy chat messages without metadata to room delivery', () => {
+    const room = projectRoomEvents([messageEvent]);
+
+    expect(room.messages[0]).toMatchObject({
+      mentions: [],
+      delivery: 'room',
+    });
+  });
+
+  it('falls back to safe chat metadata when event metadata is malformed', () => {
+    const room = projectRoomEvents([
+      {
+        ...messageEvent,
+        payload: {
+          text: 'Hello',
+          mentions: [
+            { type: 'participant', id: 'maya-1' },
+            { type: 'alias', alias: 'everyone' },
+          ],
+          delivery: 'direct',
+        },
+      },
+    ]);
+
+    expect(room.messages[0]).toMatchObject({
+      mentions: [],
+      delivery: 'room',
+    });
+  });
+});
+
+describe('gateway error mapping', () => {
+  it('explains unknown mentioned participants', () => {
+    expect(readGatewayError({ code: -32013 })).toEqual({
+      code: -32013,
+      message: 'The message mentions an unknown participant.',
+    });
   });
 });

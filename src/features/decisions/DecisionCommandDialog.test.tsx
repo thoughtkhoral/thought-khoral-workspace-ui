@@ -37,6 +37,8 @@ describe('DecisionCommandDialog', () => {
             actor: { id: 'human-1', role: 'human' },
             occurredAt: '2026-09-18T12:00:00Z',
             text: 'Evidence message',
+            mentions: [],
+            delivery: 'room',
           },
         ]}
         onCreate={onCreate}
