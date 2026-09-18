@@ -328,6 +328,34 @@ describe('useRoomSocket', () => {
 
     expect(result.current.participants[0]?.online).toBe(false);
   });
+
+  it('returns the generated request ID for a mutation send', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const getAccessToken = vi.fn(async () => 'opaque-access-token');
+    const { result } = renderHook(() =>
+      useRoomSocket({
+        roomId: 'room-1',
+        getAccessToken,
+        createSocket,
+      }),
+    );
+
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+    await waitFor(() => expect(socket.sent).toHaveLength(1));
+    let requestId: string | false = false;
+    act(() => {
+      requestId = result.current.send('decision.delete', {
+        decisionId: 'decision-1',
+      });
+    });
+
+    expect(requestId).not.toBe(false);
+    const request = JSON.parse(socket.sent.at(-1)!);
+    expect(requestId).toBe(request.id);
+    expect(requestId).toBe(request.params.requestId);
+  });
 });
 
 describe('RoomPage governance', () => {

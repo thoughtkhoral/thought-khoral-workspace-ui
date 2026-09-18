@@ -250,8 +250,9 @@ export function useRoomSocket({
         });
         return false;
       }
-      socket.send(JSON.stringify(createRpcRequest(method, roomId, params)));
-      return true;
+      const request = createRpcRequest(method, roomId, params);
+      socket.send(JSON.stringify(request));
+      return request.params.requestId;
     },
     [roomId],
   );
