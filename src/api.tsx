@@ -255,13 +255,23 @@ function readStringArray(value: unknown): string[] | null {
     : null;
 }
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const mentionTokenPattern = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
+const maxChatMentions = 50;
+
 function isChatMention(value: unknown): value is ChatMention {
   if (!isRecord(value) || typeof value.type !== 'string') {
     return false;
   }
 
   if (value.type === 'participant') {
-    return typeof value.id === 'string' && typeof value.token === 'string';
+    return (
+      typeof value.id === 'string' &&
+      uuidPattern.test(value.id) &&
+      typeof value.token === 'string' &&
+      mentionTokenPattern.test(value.token)
+    );
   }
 
   return (
@@ -271,11 +281,44 @@ function isChatMention(value: unknown): value is ChatMention {
 }
 
 function readChatMentions(value: unknown): ChatMention[] | null {
-  return Array.isArray(value) && value.every(isChatMention) ? value : null;
+  if (
+    !Array.isArray(value) ||
+    value.length > maxChatMentions ||
+    !value.every(isChatMention)
+  ) {
+    return null;
+  }
+
+  const mentionKeys = new Set<string>();
+  for (const mention of value) {
+    const key =
+      mention.type === 'participant'
+        ? `participant:${mention.id}`
+        : `alias:${mention.alias}`;
+    if (mentionKeys.has(key)) {
+      return null;
+    }
+    mentionKeys.add(key);
+  }
+
+  return value;
 }
 
 function readChatDelivery(value: unknown): ChatDelivery | null {
   return value === 'room' || value === 'mentioned' ? value : null;
+}
+
+function readChatMetadata(
+  mentionsValue: unknown,
+  deliveryValue: unknown,
+): Pick<RoomMessage, 'mentions' | 'delivery'> {
+  const mentions = readChatMentions(mentionsValue);
+  const delivery = readChatDelivery(deliveryValue);
+  if (!mentions || !delivery || (delivery === 'mentioned' && mentions.length === 0)) {
+    return { mentions: [], delivery: 'room' };
+  }
+
+  return { mentions, delivery };
 }
 
 function fallbackDisplayName(actor: RoomActor): string {
@@ -309,13 +352,16 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
     if (event.eventType === 'message.created') {
       const text = readString(event.payload.text);
       if (text) {
+        const metadata = readChatMetadata(
+          event.payload.mentions,
+          event.payload.delivery,
+        );
         messages.push({
           eventId: event.eventId,
           actor: event.actor,
           occurredAt: event.occurredAt,
           text,
-          mentions: readChatMentions(event.payload.mentions) ?? [],
-          delivery: readChatDelivery(event.payload.delivery) ?? 'room',
+          ...metadata,
         });
       }
       continue;

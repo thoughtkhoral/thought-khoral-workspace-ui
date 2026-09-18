@@ -118,7 +118,11 @@ describe('chat message metadata projection', () => {
         payload: {
           text: 'Please review this, @Maya and @allagents.',
           mentions: [
-            { type: 'participant', id: 'maya-1', token: '@Maya' },
+            {
+              type: 'participant',
+              id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+              token: 'maya-chen',
+            },
             { type: 'alias', alias: 'allagents' },
           ],
           delivery: 'mentioned',
@@ -133,7 +137,11 @@ describe('chat message metadata projection', () => {
         occurredAt: '2026-09-15T12:00:00Z',
         text: 'Please review this, @Maya and @allagents.',
         mentions: [
-          { type: 'participant', id: 'maya-1', token: '@Maya' },
+          {
+            type: 'participant',
+            id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+            token: 'maya-chen',
+          },
           { type: 'alias', alias: 'allagents' },
         ],
         delivery: 'mentioned',
@@ -150,25 +158,58 @@ describe('chat message metadata projection', () => {
     });
   });
 
-  it('falls back to safe chat metadata when event metadata is malformed', () => {
+  it.each([
+    [
+      'has malformed participant metadata',
+      [{ type: 'participant', id: 'maya-1', token: '@maya-chen' }],
+      'mentioned',
+    ],
+    [
+      'has an invalid delivery with valid mentions',
+      [
+        {
+          type: 'participant',
+          id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+          token: 'maya-chen',
+        },
+      ],
+      'direct',
+    ],
+    ['marks an empty mention list as mentioned', [], 'mentioned'],
+    [
+      'contains duplicate mentions',
+      [
+        {
+          type: 'participant',
+          id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+          token: 'maya-chen',
+        },
+        {
+          type: 'participant',
+          id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+          token: 'maya-chen',
+        },
+      ],
+      'mentioned',
+    ],
+    [
+      'contains more than 50 mentions',
+      Array.from({ length: 51 }, (_, index) => ({
+        type: 'participant',
+        id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+        token: `person-${index}`,
+      })),
+      'mentioned',
+    ],
+  ])('falls back to safe metadata when a chat message %s', (_, mentions, delivery) => {
     const room = projectRoomEvents([
       {
         ...messageEvent,
-        payload: {
-          text: 'Hello',
-          mentions: [
-            { type: 'participant', id: 'maya-1' },
-            { type: 'alias', alias: 'everyone' },
-          ],
-          delivery: 'direct',
-        },
+        payload: { text: 'Hello', mentions, delivery },
       },
     ]);
 
-    expect(room.messages[0]).toMatchObject({
-      mentions: [],
-      delivery: 'room',
-    });
+    expect(room.messages[0]).toMatchObject({ mentions: [], delivery: 'room' });
   });
 });
 
