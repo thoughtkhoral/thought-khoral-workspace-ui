@@ -9,7 +9,8 @@ export type RoomEventType =
   | 'decision.proposed'
   | 'decision.confirmed'
   | 'decision.edited'
-  | 'decision.dismissed';
+  | 'decision.dismissed'
+  | 'decision.deleted';
 
 export interface RoomActor {
   id: string;
@@ -67,7 +68,12 @@ export interface GatewayError {
 export interface RpcRequest {
   jsonrpc: '2.0';
   id: string;
-  method: 'room.join' | 'chat.send' | 'decision.transition';
+  method:
+    | 'room.join'
+    | 'chat.send'
+    | 'decision.propose'
+    | 'decision.transition'
+    | 'decision.delete';
   params: Record<string, unknown> & {
     contractVersion: typeof CONTRACT_VERSION;
     requestId: string;
@@ -82,6 +88,7 @@ const eventTypes = new Set<RoomEventType>([
   'decision.confirmed',
   'decision.edited',
   'decision.dismissed',
+  'decision.deleted',
 ]);
 
 const safeErrorMessages = new Map<number, string>([
@@ -284,6 +291,11 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
       if (prior) {
         decisions.set(decisionId, { ...prior, status: 'superseded' });
       }
+      continue;
+    }
+
+    if (event.eventType === 'decision.deleted') {
+      decisions.delete(decisionId);
       continue;
     }
 
