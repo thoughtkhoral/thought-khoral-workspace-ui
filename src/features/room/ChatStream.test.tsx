@@ -110,7 +110,21 @@ describe('ChatStream', () => {
     expect(onCommand).not.toHaveBeenCalled();
     expect(onSendMessage).not.toHaveBeenCalled();
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      'Unknown command. Try /decisions.',
+      'Unrecognized command: /unknown',
     );
+    expect(container.querySelector('[role="alert"]')?.textContent).not.toContain(
+      'Try /decisions',
+    );
+
+    await user.type(input, ' ordinary message');
+    await user.keyboard('{Enter}');
+    expect(container.querySelector('[role="alert"]')).toBeTruthy();
+
+    await user.click(
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Dismiss command error"]',
+      )!,
+    );
+    expect(container.querySelector('[role="alert"]')).toBeNull();
   });
 });
