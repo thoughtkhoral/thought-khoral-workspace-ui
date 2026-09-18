@@ -491,6 +491,109 @@ describe('RoomPage governance', () => {
     expect(screen.getByRole('button', { name: 'Close participants' })).toBeTruthy();
   });
 
+  it('sends mentioned-only messages to a participant from the socket roster', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <RoomPage
+        roomId={validRoomId}
+        participantRole="human"
+        getAccessToken={async () => 'opaque-access-token'}
+        createSocket={createSocket}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+    act(() =>
+      socket.receive({
+        jsonrpc: '2.0',
+        id: 'join-response',
+        result: {
+          events: [],
+          participants: [
+            { id: 'maya-1', role: 'human', displayName: 'Maya Chen', online: true },
+            { id: 'scout-2', role: 'agent', displayName: 'Scout Bot', online: true },
+          ],
+        },
+      }),
+    );
+
+    const input = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')!;
+    await user.selectOptions(screen.getByLabelText('Message delivery'), 'mentioned');
+    await user.type(input, 'Please review this @');
+    expect(screen.getByRole('option', { name: /@maya-chen/i })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /@scout-bot/i })).toBeTruthy();
+    await user.type(input, 'maya');
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+
+    const request = socket.sent.map((item) => JSON.parse(item)).find((item) => item.method === 'chat.send');
+    expect(request.params).toMatchObject({
+      text: 'Please review this @maya-chen',
+      mentions: [{ type: 'participant', id: 'maya-1', token: 'maya-chen' }],
+      delivery: 'mentioned',
+    });
+  });
+
+  it('sends automated decision-result messages room-wide', async () => {
+    const socket = new FakeRoomSocket();
+    const createSocket = vi.fn(() => socket);
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <RoomPage
+        roomId={validRoomId}
+        participantRole="human"
+        getAccessToken={async () => 'opaque-access-token'}
+        createSocket={createSocket}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Enter room' }));
+    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+    act(() => socket.open());
+
+    const input = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')!;
+    await user.type(input, '/decisions');
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.type(screen.getByRole('textbox', { name: 'Decision title' }), 'Use region one');
+    await user.type(screen.getByRole('textbox', { name: 'Decision summary' }), 'Start in region one.');
+    await user.click(screen.getByRole('button', { name: 'Create decision' }));
+
+    const proposal = socket.sent.map((item) => JSON.parse(item)).find((item) => item.method === 'decision.propose');
+    act(() =>
+      socket.receive({
+        contractVersion: 'n2n.room.v1',
+        requestId: proposal.params.requestId,
+        roomId: validRoomId,
+        occurredAt: '2026-09-18T12:00:00Z',
+        sequence: 1,
+        eventId: 'event-decision-created',
+        eventType: 'decision.proposed',
+        actor: { id: 'maya-1', role: 'human' },
+        payload: {
+          decisionId: 'decision-created',
+          status: 'draft',
+          title: 'Use region one',
+          summary: 'Start in region one.',
+          sourceEventIds: [],
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      const request = socket.sent.map((item) => JSON.parse(item)).find((item) => item.method === 'chat.send');
+      expect(request.params).toMatchObject({
+        text: 'Created decision: Use region one.',
+        mentions: [],
+        delivery: 'room',
+      });
+    });
+  });
+
   it('waits for a normalized confirmation before showing active memory', async () => {
     const socket = new FakeRoomSocket();
     const createSocket = vi.fn(() => socket);

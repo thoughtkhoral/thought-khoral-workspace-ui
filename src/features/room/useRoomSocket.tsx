@@ -240,7 +240,7 @@ export function useRoomSocket({
   const send = useCallback(
     (
       method: Exclude<RpcRequest['method'], 'room.join'>,
-      params: Record<string, unknown>,
+      params: object,
     ) => {
       const socket = socketRef.current;
       if (!roomId || !socket || socket.readyState !== WebSocket.OPEN) {
@@ -250,7 +250,7 @@ export function useRoomSocket({
         });
         return false;
       }
-      const request = createRpcRequest(method, roomId, params);
+      const request = createRpcRequest(method, roomId, { ...params });
       socket.send(JSON.stringify(request));
       return request.params.requestId;
     },

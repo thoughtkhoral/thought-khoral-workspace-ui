@@ -130,7 +130,11 @@ export function RoomPage({
         : pending.kind === 'update'
           ? 'Updated decision'
           : 'Deleted decision';
-      send('chat.send', { text: `${label}: ${pending.title ?? 'decision'}.` });
+      send('chat.send', {
+        text: `${label}: ${pending.title ?? 'decision'}.`,
+        mentions: [],
+        delivery: 'room',
+      });
     }
   }, [events, send]);
 
@@ -245,7 +249,7 @@ export function RoomPage({
                     isConnected={isConnected}
                     canManageDecisions={canManageDecisions}
                     onCommand={() => setIsDecisionDialogOpen(true)}
-                    onSendMessage={(values) => send('chat.send', { ...values })}
+                    onSendMessage={(values) => send('chat.send', values)}
                   />
                 </StackItem>
                 <StackItem>
