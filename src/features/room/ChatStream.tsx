@@ -6,7 +6,7 @@ import ChatbotFooter from '@patternfly/chatbot/dist/dynamic/ChatbotFooter';
 import Message from '@patternfly/chatbot/dist/dynamic/Message';
 import MessageBar from '@patternfly/chatbot/dist/dynamic/MessageBar';
 import MessageBox from '@patternfly/chatbot/dist/dynamic/MessageBox';
-import { Alert } from '@patternfly/react-core';
+import { Alert, AlertActionCloseButton } from '@patternfly/react-core';
 import { useState } from 'react';
 
 import type { RoomMessage } from '../../api';
@@ -36,7 +36,6 @@ export function ChatStream({
     if (text.startsWith('/')) {
       if (text === '/decisions') {
         if (canManageDecisions && onCommand) {
-          setCommandError(null);
           onCommand('decisions');
         } else {
           setCommandError(
@@ -45,11 +44,10 @@ export function ChatStream({
         }
         return;
       }
-      setCommandError('Unknown command. Try /decisions.');
+      setCommandError(`Unrecognized command: ${text}`);
       return;
     }
 
-    setCommandError(null);
     onSendMessage(text);
   };
 
@@ -91,6 +89,12 @@ export function ChatStream({
             isInline
             title="Command not recognized"
             role="alert"
+            actionClose={
+              <AlertActionCloseButton
+                aria-label="Dismiss command error"
+                onClose={() => setCommandError(null)}
+              />
+            }
           >
             {commandError}
           </Alert>
