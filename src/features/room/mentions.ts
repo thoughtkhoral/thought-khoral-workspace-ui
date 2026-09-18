@@ -154,7 +154,7 @@ export function mentionTokens(value: string): MentionToken[] {
   for (const match of value.matchAll(mentionTokenPattern)) {
     const start = match.index ?? 0;
     const end = start + match[0].length;
-    if (isMentionBoundary(value, start) && !/[a-z0-9.-]/i.test(value.charAt(end))) {
+    if (isMentionBoundary(value, start) && !/[a-z0-9._-]/i.test(value.charAt(end))) {
       tokens.push({ token: match[1].toLowerCase(), start, end });
     }
   }

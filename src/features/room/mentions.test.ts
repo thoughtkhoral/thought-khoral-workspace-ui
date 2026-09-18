@@ -155,8 +155,8 @@ describe('insertMention', () => {
 
 describe('mentionTokens', () => {
   it('returns only complete tokens that start at mention boundaries', () => {
-    expect(mentionTokens('email@maya-chen @maya-chen.extra @maya-chen')).toEqual([
-      { token: 'maya-chen', start: 33, end: 43 },
+    expect(mentionTokens('email@maya-chen @maya-chen.extra @maya-chen_foo @maya-chen')).toEqual([
+      { token: 'maya-chen', start: 48, end: 58 },
     ]);
   });
 });
