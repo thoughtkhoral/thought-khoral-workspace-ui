@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONTRACT_VERSION,
+  isRoomEvent,
   isParticipantUpdate,
   projectRoomEvents,
   type RoomEvent,
@@ -53,6 +54,55 @@ describe('room participant projection', () => {
               online: true,
             },
           ],
+        },
+      }),
+    ).toBe(true);
+  });
+});
+
+describe('room decision projection', () => {
+  it('removes a decision after a decision.deleted event', () => {
+    const proposed: RoomEvent = {
+      ...messageEvent,
+      sequence: 2,
+      eventId: 'decision-proposed',
+      eventType: 'decision.proposed',
+      payload: {
+        decisionId: 'decision-1',
+        title: 'Adopt JSON-RPC',
+        summary: 'Use JSON-RPC for room mutations.',
+        sourceEventIds: ['event-1'],
+      },
+    };
+    const deleted: RoomEvent = {
+      ...proposed,
+      sequence: 3,
+      eventId: 'decision-deleted',
+      eventType: 'decision.deleted',
+      payload: {
+        decisionId: 'decision-1',
+        priorStatus: 'draft',
+        title: 'Adopt JSON-RPC',
+        summary: 'Use JSON-RPC for room mutations.',
+        sourceEventIds: ['event-1'],
+      },
+    };
+
+    expect(projectRoomEvents([proposed, deleted]).decisions).toEqual([]);
+  });
+
+  it('accepts decision.deleted room events', () => {
+    expect(
+      isRoomEvent({
+        ...messageEvent,
+        eventId: 'decision-deleted',
+        eventType: 'decision.deleted',
+        payload: {
+          decisionId: 'decision-1',
+          priorStatus: 'draft',
+          title: 'Adopt JSON-RPC',
+          summary: 'Use JSON-RPC for room mutations.',
+          sourceEventIds: ['event-1'],
         },
       }),
     ).toBe(true);
