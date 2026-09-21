@@ -10,7 +10,11 @@ export type RoomEventType =
   | 'decision.confirmed'
   | 'decision.edited'
   | 'decision.dismissed'
-  | 'decision.deleted';
+  | 'decision.deleted'
+  | 'agent.task.queued'
+  | 'agent.task.running'
+  | 'agent.task.succeeded'
+  | 'agent.task.failed';
 
 export interface RoomActor {
   id: string;
@@ -58,9 +62,24 @@ export interface RoomMessage {
   delivery: ChatDelivery;
 }
 
+export interface ActionItem {
+  text: string;
+  owner?: string;
+  due?: string;
+}
+
+export interface RoomAgentTask {
+  id: string;
+  agent: RoomEvent['actor'];
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  actionItems: ActionItem[];
+  failureCode?: string;
+}
+
 export interface RoomProjection {
   messages: RoomMessage[];
   decisions: Decision[];
+  tasks: RoomAgentTask[];
   participants: RoomParticipant[];
 }
 
@@ -103,6 +122,10 @@ const eventTypes = new Set<RoomEventType>([
   'decision.edited',
   'decision.dismissed',
   'decision.deleted',
+  'agent.task.queued',
+  'agent.task.running',
+  'agent.task.succeeded',
+  'agent.task.failed',
 ]);
 
 const safeErrorMessages = new Map<number, string>([
@@ -345,6 +368,7 @@ export function projectRoomParticipants(
 export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection {
   const messages: RoomMessage[] = [];
   const decisions = new Map<string, Decision>();
+  const tasks = new Map<string, RoomAgentTask>();
 
   for (const event of [...events].sort(
     (left, right) => left.sequence - right.sequence,
@@ -364,6 +388,28 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
           ...metadata,
         });
       }
+      continue;
+    }
+
+    if (event.eventType.startsWith('agent.task.')) {
+      const taskId = readString(event.payload.taskId);
+      if (!taskId) continue;
+      const status = event.eventType.slice('agent.task.'.length) as RoomAgentTask['status'];
+      const actionItems = Array.isArray((event.payload.result as Record<string, unknown> | undefined)?.actionItems)
+          ? ((event.payload.result as Record<string, unknown>).actionItems as unknown[])
+              .flatMap((item) => isRecord(item) && readString(item.text) ? [{
+                text: readString(item.text)!,
+                owner: readString(item.owner) ?? undefined,
+                due: readString(item.due) ?? undefined,
+              }] : [])
+          : tasks.get(taskId)?.actionItems ?? [];
+      tasks.set(taskId, {
+        id: taskId,
+        agent: event.actor,
+        status,
+        actionItems,
+        failureCode: readString((event.payload.failure as Record<string, unknown> | undefined)?.code) ?? undefined,
+      });
       continue;
     }
 
@@ -412,6 +458,7 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
   return {
     messages,
     decisions: [...decisions.values()],
+    tasks: [...tasks.values()],
     participants: projectRoomParticipants(events),
   };
 }

@@ -32,6 +32,10 @@ These callbacks may update a non-secret room URL binding, but must not clear or
 log OIDC tokens. The UI does not add `room.leave`, durable membership, kick,
 history deletion, or any client-side authoritative event persistence.
 
+## Agent task projection
+
+Per root [decision 006](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/006-agent-task-dispatch.md), the UI consumes additive server-produced agent-task lifecycle events. It projects one card per task in the transcript using gateway-normalized provenance, status, safe failure data, and structured action items. The UI does not dispatch or synthesize task lifecycle events; it only exposes the registered Action Items Agent through the existing participant roster and mention composer.
+
 The accepted local [ThoughtKhoral identity decision](../decisions/002-thoughtkhoral-identity.md) renames this project to `thought-khoral-workspace-ui`. The `n2n.room.v1` wire value remains unchanged; database and persisted values are outside this identity migration.
 
 The npm package is named `thought-khoral-workspace-ui`, and the host supplies the existing authentication and socket adapters through `window.thoughtKhoralWorkspace`. Production HTML, visible headings, and accessibility labels use ThoughtKhoral display text. The production-preview smoke check loads the built HTML and requires the ThoughtKhoral document title and workspace heading after bootstrap while continuing to exercise the emitted application entry and lazy ChatBot chunk.

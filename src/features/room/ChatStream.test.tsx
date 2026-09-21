@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -162,6 +162,34 @@ describe('ChatStream', () => {
         { type: 'participant', id: 'maya-1', token: 'maya-chen' },
         { type: 'participant', id: 'bot-2', token: 'scout-bot' },
       ],
+      delivery: 'room',
+    });
+  });
+
+  it('sends pasted multiline agent tasks unchanged', async () => {
+    const user = userEvent.setup();
+    const onSendMessage = vi.fn();
+    const { container } = render(
+      <ChatStream
+        isConnected
+        messages={[]}
+        participants={participants}
+        onSendMessage={onSendMessage}
+      />,
+    );
+
+    const input = inputFor(container);
+    fireEvent.change(input, {
+      target: {
+        value: '@scout-bot\n- Prepare rollout checklist',
+        selectionStart: '@scout-bot\n- Prepare rollout checklist'.length,
+      },
+    });
+    await user.click(within(container).getByRole('button', { name: 'Send message' }));
+
+    expect(onSendMessage).toHaveBeenCalledWith({
+      text: '@scout-bot\n- Prepare rollout checklist',
+      mentions: [{ type: 'participant', id: 'bot-2', token: 'scout-bot' }],
       delivery: 'room',
     });
   });

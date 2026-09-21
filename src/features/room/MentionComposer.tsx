@@ -1,5 +1,4 @@
-import MessageBar from '@patternfly/chatbot/dist/dynamic/MessageBar';
-import { Alert, FormGroup } from '@patternfly/react-core';
+import { Alert, Button, FormGroup, TextArea } from '@patternfly/react-core';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 
 import type { ChatMention, ChatSendValues, RoomParticipant } from '../../api';
@@ -125,7 +124,7 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
         </Alert>
       )}
       <div className="thought-khoral-mention-input">
-        <MessageBar
+        <TextArea
           aria-label="Message"
           role="combobox"
           aria-haspopup="listbox"
@@ -134,13 +133,10 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
           aria-activedescendant={suggestions.length > 0
             ? mentionOptionId(suggestions[activeIndex] ?? suggestions[0]!)
             : undefined}
-          placeholder={isConnected ? 'Send a room message' : 'Waiting for the room'}
-          hasAttachButton={false}
-          alwayShowSendButton
           value={text}
           isDisabled={!isConnected}
-          isSendButtonDisabled={cannotSend}
-          buttonProps={{ send: { props: { 'aria-label': 'Send message' } } }}
+          resizeOrientation="vertical"
+          rows={3}
           onChange={(event) => {
             setText(String(event.target.value));
             setCursor(event.target.selectionStart ?? event.target.value.length);
@@ -156,8 +152,15 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
             setCursor(event.currentTarget.selectionStart ?? text.length);
             setIsMenuOpen(true);
           }}
-          onSendMessage={submit}
         />
+        <Button
+          aria-label="Send message"
+          isDisabled={cannotSend}
+          onClick={submit}
+          variant="primary"
+        >
+          Send
+        </Button>
         {suggestions.length > 0 && (
           <ul
             id={mentionSuggestionsId}

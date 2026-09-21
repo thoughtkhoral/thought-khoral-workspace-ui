@@ -22,6 +22,9 @@
   room. Keycloak SSO may skip the password form, but that does not count as
   room membership or room entry.
 - The UI renders normalized room messages and decision events from the gateway.
+- The UI renders normalized agent-task lifecycle events as room-visible,
+  agent-attributed task cards and discovers registered executable agents through
+  the existing participant/mention interaction.
 - A human viewing a draft decision can invoke Confirm, Edit, or Dismiss; an agent sees no decision-transition control.
 - The active collective-memory view is read-only and shows only decisions that the gateway has made active.
 - The conversation roster opens as a PatternFly start-side overlay drawer and lists every known human and agent with its trusted display name, role, and explicit Online or Offline state.
