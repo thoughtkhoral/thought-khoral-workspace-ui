@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { RoomAgentTask, RoomParticipant } from '../../api';
+import { DecisionCard } from '../decisions/DecisionCard';
 import { ChatStream } from './ChatStream';
 
 const participants: RoomParticipant[] = [
@@ -99,6 +100,56 @@ describe('ChatStream', () => {
     expect(handoff.getAttribute('target')).toBe('_blank');
     expect(handoff.getAttribute('rel')).toBe('noopener noreferrer');
     expect(handoff.textContent).toContain('handoff.example.test');
+  });
+
+  it('focuses active decision cards and their persisted source targets from citations', async () => {
+    const user = userEvent.setup();
+    const decisionId = '86000000-0000-4000-8000-000000000001';
+    const sourceEventId = '86000000-0000-4000-8000-000000000002';
+    const task: RoomAgentTask = {
+      id: '84000000-0000-4000-8000-000000000001',
+      agent: { id: '74686f75-6768-746b-686f-72616c000003', role: 'agent' },
+      status: 'succeeded',
+      actionItems: [],
+      citations: [decisionId, sourceEventId],
+    };
+    render(
+      <>
+        <DecisionCard
+          decision={{
+            id: decisionId,
+            title: 'Ship the foundation',
+            summary: 'The gateway foundation is approved.',
+            sourceEventIds: [sourceEventId],
+            status: 'active',
+          }}
+          participantRole="agent"
+          onTransition={() => undefined}
+        />
+        <ChatStream
+          isConnected
+          messages={[]}
+          tasks={[task]}
+          participants={participants}
+          onSendMessage={() => undefined}
+        />
+      </>,
+    );
+    const decision = document.getElementById(`decision-${decisionId}`)!;
+    const source = document.getElementById(`decision-source-${sourceEventId}`)!;
+    decision.scrollIntoView = vi.fn();
+    decision.focus = vi.fn();
+    source.scrollIntoView = vi.fn();
+    source.focus = vi.fn();
+
+    const taskCard = screen.getByRole('status', { name: /reference agent task succeeded/i });
+    await user.click(within(taskCard).getByRole('button', { name: 'Citation 1' }));
+    await user.click(within(taskCard).getByRole('button', { name: 'Citation 2' }));
+
+    expect(decision.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+    expect(decision.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(source.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+    expect(source.focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 
   it('renders the PatternFly room conversation', () => {

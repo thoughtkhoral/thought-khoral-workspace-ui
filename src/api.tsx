@@ -589,6 +589,7 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
       const externalTask = readExternalTask(event);
       if (!externalTask) continue;
       const previous = tasks.get(externalTask.id);
+      const isTerminal = externalTask.status === 'succeeded' || externalTask.status === 'failed';
       tasks.set(externalTask.id, {
         ...previous,
         ...externalTask,
@@ -598,6 +599,7 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
         percent: externalTask.percent ?? previous?.percent,
         summary: externalTask.summary ?? previous?.summary,
         citations: externalTask.citations ?? previous?.citations,
+        handoff: isTerminal ? undefined : externalTask.handoff ?? previous?.handoff,
       });
       continue;
     }
@@ -666,12 +668,20 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
     });
   }
 
+  const projectedDecisions = [...decisions.values()];
+  const citeableIds = new Set([
+    ...events.map((event) => event.eventId),
+    ...projectedDecisions
+      .filter((decision) => decision.status === 'active')
+      .flatMap((decision) => [decision.id, ...decision.sourceEventIds]),
+  ]);
+
   return {
     messages,
-    decisions: [...decisions.values()],
+    decisions: projectedDecisions,
     tasks: [...tasks.values()].map((task) => ({
       ...task,
-      citations: task.citations?.filter((citation) => events.some((event) => event.eventId === citation)),
+      citations: task.citations?.filter((citation) => citeableIds.has(citation)),
     })),
     participants: projectRoomParticipants(events),
   };

@@ -89,7 +89,9 @@ export function ChatStream({
   };
 
   const focusCitation = (eventId: string) => {
-    const citedEvent = document.getElementById(eventId);
+    const citedEvent = document.getElementById(eventId) ??
+      document.getElementById(`decision-${eventId}`) ??
+      document.getElementById(`decision-source-${eventId}`);
     if (!citedEvent) return;
     citedEvent.scrollIntoView({ block: 'center' });
     citedEvent.focus({ preventScroll: true });

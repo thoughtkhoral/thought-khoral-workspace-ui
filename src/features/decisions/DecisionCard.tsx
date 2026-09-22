@@ -46,7 +46,7 @@ export function DecisionCard({
   const canTransition = participantRole === 'human' && decision.status === 'draft';
 
   return (
-    <Card isCompact>
+    <Card id={`decision-${decision.id}`} tabIndex={-1} isCompact>
       <CardTitle>
         {decision.title} <Label>{decision.status}</Label>
       </CardTitle>
@@ -55,6 +55,14 @@ export function DecisionCard({
         <Content component="small">
           Source events: {decision.sourceEventIds.join(', ')}
         </Content>
+        {decision.sourceEventIds.map((sourceEventId) => (
+          <span
+            id={`decision-source-${sourceEventId}`}
+            key={sourceEventId}
+            tabIndex={-1}
+            className="thought-khoral-decision-source-target"
+          />
+        ))}
         {canTransition && isEditing && (
           <DecisionEditForm
             decision={decision}

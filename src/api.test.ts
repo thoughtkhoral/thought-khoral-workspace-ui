@@ -371,4 +371,92 @@ describe('external agent task projection', () => {
       }),
     ]);
   });
+
+  it('retains citations to active decisions and clears an awaiting handoff on success', () => {
+    const decisionId = '86000000-0000-4000-8000-000000000001';
+    const proposed: RoomEvent = {
+      ...messageEvent,
+      sequence: 2,
+      eventId: '86000000-0000-4000-8000-000000000002',
+      eventType: 'decision.proposed',
+      payload: {
+        decisionId,
+        title: 'Ship the foundation',
+        summary: 'The gateway foundation is approved.',
+        sourceEventIds: [citationId],
+      },
+    };
+    const confirmed: RoomEvent = {
+      ...proposed,
+      sequence: 3,
+      eventId: '86000000-0000-4000-8000-000000000003',
+      eventType: 'decision.confirmed',
+    };
+    const awaiting: RoomEvent = {
+      ...requested,
+      sequence: 4,
+      eventType: 'agent.task.awaiting_external_input',
+      payload: {
+        ...requested.payload,
+        handoff: {
+          instruction: 'Sign in to continue.',
+          url: 'https://handoff.example.test/continue',
+          host: 'handoff.example.test',
+          expiresAt: '2026-09-22T13:00:00Z',
+        },
+      },
+    };
+    const succeeded: RoomEvent = {
+      ...requested,
+      sequence: 5,
+      eventType: 'agent.task.succeeded',
+      payload: {
+        ...requested.payload,
+        result: {
+          kind: 'context-summary.v1',
+          summary: 'The decision is approved.',
+          citations: [decisionId, citationId],
+        },
+      },
+    };
+
+    const room = projectRoomEvents([messageEvent, proposed, confirmed, requested, awaiting, succeeded]);
+
+    expect(room.decisions).toEqual([expect.objectContaining({ id: decisionId, status: 'active' })]);
+    expect(room.tasks).toEqual([expect.objectContaining({
+      citations: [decisionId, citationId],
+      handoff: undefined,
+      status: 'succeeded',
+    })]);
+  });
+
+  it('clears an awaiting handoff when an external task fails', () => {
+    const awaiting: RoomEvent = {
+      ...requested,
+      sequence: 3,
+      eventType: 'agent.task.awaiting_external_input',
+      payload: {
+        ...requested.payload,
+        handoff: {
+          instruction: 'Sign in to continue.',
+          url: 'https://handoff.example.test/continue',
+          host: 'handoff.example.test',
+          expiresAt: '2026-09-22T13:00:00Z',
+        },
+      },
+    };
+    const failed: RoomEvent = {
+      ...requested,
+      sequence: 4,
+      eventType: 'agent.task.failed',
+      payload: {
+        ...requested.payload,
+        failure: { code: 'execution_failed' },
+      },
+    };
+
+    expect(projectRoomEvents([requested, awaiting, failed]).tasks).toEqual([
+      expect.objectContaining({ handoff: undefined, status: 'failed' }),
+    ]);
+  });
 });

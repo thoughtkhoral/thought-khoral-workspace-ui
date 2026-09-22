@@ -69,3 +69,8 @@
   display: flex;
   gap: var(--pf-t--global--spacer--sm);
 }
+
+.thought-khoral-decision-source-target {
+  display: block;
+  block-size: 0;
+}

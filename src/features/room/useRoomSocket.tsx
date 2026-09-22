@@ -255,7 +255,7 @@ export function useRoomSocket({
 
   const send = useCallback(
     (
-      method: Exclude<RpcRequest['method'], 'room.join'>,
+      method: Exclude<RpcRequest['method'], 'room.join' | 'agent.task.start'>,
       params: object,
     ) => {
       if (!roomId) {
