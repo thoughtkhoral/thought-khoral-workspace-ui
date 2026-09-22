@@ -271,6 +271,17 @@ describe('external agent task projection', () => {
     },
   };
 
+  it('accepts the human invocation and retains every lifecycle citation source', () => {
+    const humanRequested: RoomEvent = { ...requested, actor: {id: requested.payload.requesterId as string, role: 'human'} };
+    const progress: RoomEvent = { ...requested, eventId: '82000000-0000-4000-8000-000000000002', sequence: 3, eventType: 'agent.task.progressed', payload: {...requested.payload, phase: 'working', text: 'Reading context'} };
+    expect(isRoomEvent(humanRequested)).toBe(true);
+    expect(isRoomEvent(requested)).toBe(false);
+    const task = projectRoomEvents([humanRequested, progress]).tasks[0];
+    expect(task.invocationEventId).toBe(humanRequested.eventId);
+    expect(task.events?.map(event => event.eventId)).toEqual([humanRequested.eventId, progress.eventId]);
+    expect(task.agent.id).toBe(externalAgentId);
+  });
+
   it('projects requested, progressed, and successful context summaries with persisted citations', () => {
     const progressed: RoomEvent = {
       ...requested,

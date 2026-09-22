@@ -8,7 +8,7 @@ import MessageBox from '@patternfly/chatbot/dist/dynamic/MessageBox';
 import { Alert, AlertActionCloseButton } from '@patternfly/react-core';
 import { useState, type ReactNode } from 'react';
 
-import type { ChatMention, ChatSendValues, RoomAgentTask, RoomMessage, RoomParticipant } from '../../api';
+import type { ChatMention, ChatSendValues, RoomAgentTask, RoomEvent, RoomMessage, RoomParticipant } from '../../api';
 import './ChatStream.css';
 import { MentionComposer } from './MentionComposer';
 import { mentionTokens } from './mentions';
@@ -16,6 +16,7 @@ import { mentionTokens } from './mentions';
 export interface ChatStreamProps {
   messages: readonly RoomMessage[];
   tasks?: readonly RoomAgentTask[];
+  sourceEvents?: readonly RoomEvent[];
   participants: readonly RoomParticipant[];
   onSendMessage: (values: ChatSendValues) => void;
   onCommand?: (command: 'decisions') => void;
@@ -26,6 +27,7 @@ export interface ChatStreamProps {
 export function ChatStream({
   messages,
   tasks = [],
+  sourceEvents = [],
   participants,
   onSendMessage,
   onCommand,
@@ -134,6 +136,11 @@ export function ChatStream({
           {tasks.map((task) => (
             <section key={task.id} role="status" aria-label={`Reference Agent task ${task.status}`} className="thought-khoral-agent-task">
               <strong>{task.skillId ? `Reference Agent: ${task.skillId}` : 'Action Items'}: {task.status}</strong>
+              {task.events?.map(event => (
+                <div key={event.eventId} id={event.eventId} tabIndex={-1}>
+                  {event.eventType.slice('agent.task.'.length)} · {event.occurredAt}
+                </div>
+              ))}
               {task.phase && <div>Phase: {task.phase}</div>}
               {task.progressText && <div>{task.progressText}{task.percent !== undefined ? ` (${task.percent}%)` : ''}</div>}
               {task.summary && <p>{task.summary}</p>}
@@ -157,6 +164,12 @@ export function ChatStream({
               )}
               {task.failureCode && <div>Task failed: {task.failureCode}</div>}
             </section>
+          ))}
+          {sourceEvents.filter(event => !messages.some(message => message.eventId === event.eventId) &&
+            !tasks.some(task => task.events?.some(source => source.eventId === event.eventId))).map(event => (
+            <div key={event.eventId} id={event.eventId} tabIndex={-1}>
+              {event.eventType} · {event.occurredAt}
+            </div>
           ))}
         </MessageBox>
       </ChatbotContent>

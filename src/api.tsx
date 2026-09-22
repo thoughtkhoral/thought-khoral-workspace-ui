@@ -82,6 +82,8 @@ export interface ActionItem {
 
 export interface RoomAgentTask {
   id: string;
+  invocationEventId?: string;
+  events?: Pick<RoomEvent, 'eventId' | 'eventType' | 'occurredAt'>[];
   agent: RoomEvent['actor'];
   status:
     | 'queued'
@@ -318,8 +320,10 @@ export function isRoomEvent(value: unknown): value is RoomEvent {
   }
   const isExternal = isExternalTaskPayload(eventType, value.payload);
   const hasExternalActor = value.actor.id === REFERENCE_AGENT_ID && value.actor.role === 'agent';
+  if (eventType === 'agent.task.requested') {
+    return isExternal && value.actor.role === 'human' && value.actor.id === value.payload.requesterId;
+  }
   if (
-    eventType === 'agent.task.requested' ||
     eventType === 'agent.task.progressed' ||
     eventType === 'agent.task.awaiting_external_input'
   ) {
@@ -503,14 +507,17 @@ function fallbackDisplayName(actor: RoomActor): string {
 
 function readExternalTask(event: RoomEvent): RoomAgentTask | null {
   if (
-    event.actor.id !== REFERENCE_AGENT_ID ||
-    event.actor.role !== 'agent' ||
+    !isRoomEvent(event) ||
     !isExternalTaskPayload(event.eventType, event.payload)
   ) return null;
   const payload = event.payload;
   const task: RoomAgentTask = {
     id: payload.taskId as string,
-    agent: event.actor,
+    agent: event.eventType === 'agent.task.requested'
+      ? { id: REFERENCE_AGENT_ID, role: 'agent', displayName: 'Reference Agent' }
+      : event.actor,
+    invocationEventId: event.eventType === 'agent.task.requested' ? event.eventId : undefined,
+    events: [{eventId: event.eventId, eventType: event.eventType, occurredAt: event.occurredAt}],
     status: event.eventType.slice('agent.task.'.length) as RoomAgentTask['status'],
     actionItems: [],
     skillId: payload.skillId as AgentTaskSkill,
@@ -593,6 +600,8 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
       tasks.set(externalTask.id, {
         ...previous,
         ...externalTask,
+        invocationEventId: externalTask.invocationEventId ?? previous?.invocationEventId,
+        events: [...(previous?.events ?? []), ...(externalTask.events ?? [])],
         actionItems: externalTask.actionItems.length > 0 ? externalTask.actionItems : previous?.actionItems ?? [],
         phase: externalTask.phase ?? previous?.phase,
         progressText: externalTask.progressText ?? previous?.progressText,
@@ -618,6 +627,7 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
           : tasks.get(taskId)?.actionItems ?? [];
       tasks.set(taskId, {
         id: taskId,
+        events: [...(tasks.get(taskId)?.events ?? []), {eventId: event.eventId, eventType: event.eventType, occurredAt: event.occurredAt}],
         agent: event.actor,
         status,
         actionItems,

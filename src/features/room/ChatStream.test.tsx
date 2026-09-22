@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import type { RoomAgentTask, RoomParticipant } from '../../api';
+import { projectRoomEvents, type RoomEvent, type RoomAgentTask, type RoomParticipant } from '../../api';
 import { DecisionCard } from '../decisions/DecisionCard';
 import { ChatStream } from './ChatStream';
 
@@ -29,6 +29,32 @@ describe('ChatStream', () => {
         unobserve() {}
       },
     );
+  });
+
+  it('focuses every persisted lifecycle source, including the human invocation', async () => {
+    const user = userEvent.setup();
+    const events: RoomEvent[] = (['requested', 'progressed', 'succeeded'] as const).map((kind, index) => ({
+      contractVersion: 'n2n.room.v1', roomId: '10000000-0000-4000-8000-000000000001',
+      requestId: '81000000-0000-4000-8000-000000000001',
+      eventId: `82000000-0000-4000-8000-00000000000${index + 1}`, sequence: index + 1,
+      occurredAt: '2026-09-22T12:00:00Z', eventType: `agent.task.${kind}`,
+      actor: { id: index === 0 ? '85000000-0000-4000-8000-000000000001' : '74686f75-6768-746b-686f-72616c000003', role: index === 0 ? 'human' : 'agent' },
+      payload: { taskId: '84000000-0000-4000-8000-000000000001', agentId: '74686f75-6768-746b-686f-72616c000003', requesterId: '85000000-0000-4000-8000-000000000001', skillId: 'summarize-context', contextRevision: 1,
+        ...(index === 1 ? {phase: 'working', text: 'Reading context'} : {}),
+        ...(index === 2 ? {result: {kind: 'context-summary.v1', summary: 'Result', citations: ['82000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000002']}} : {}),
+      },
+    }));
+    const room = projectRoomEvents(events);
+    render(<ChatStream messages={room.messages} tasks={room.tasks} sourceEvents={events} participants={participants} isConnected onSendMessage={() => undefined} />);
+    for (const event of events) {
+      const source = document.getElementById(event.eventId);
+      expect(source).not.toBeNull();
+      source!.scrollIntoView = vi.fn();
+    }
+    await user.click(screen.getByRole('button', {name: 'Citation 1'}));
+    expect(document.activeElement?.id).toBe(events[0].eventId);
+    await user.click(screen.getByRole('button', {name: 'Citation 2'}));
+    expect(document.activeElement?.id).toBe(events[1].eventId);
   });
 
   it('renders a safe external task card with phase, result, and citation controls', async () => {

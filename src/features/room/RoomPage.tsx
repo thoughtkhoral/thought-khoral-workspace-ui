@@ -248,6 +248,7 @@ export function RoomPage({
                   <ChatStream
                     messages={room.messages}
                     tasks={room.tasks}
+                    sourceEvents={events}
                     participants={roomParticipants}
                     isConnected={isConnected}
                     canManageDecisions={canManageDecisions}
