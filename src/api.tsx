@@ -3,6 +3,15 @@ import { Alert } from '@patternfly/react-core';
 import type { Decision, ParticipantRole } from './features/decisions/DecisionCard';
 
 export const CONTRACT_VERSION = 'n2n.room.v1' as const;
+export const REFERENCE_AGENT_ID = '74686f75-6768-746b-686f-72616c000003' as const;
+export const AGENT_TASK_SKILLS = ['summarize-context', 'extract-action-items'] as const;
+
+export type AgentTaskSkill = (typeof AGENT_TASK_SKILLS)[number];
+export type AgentTaskPhase =
+  | 'accepted'
+  | 'retrieving-context'
+  | 'working'
+  | 'finalizing';
 
 export type RoomEventType =
   | 'message.created'
@@ -13,6 +22,9 @@ export type RoomEventType =
   | 'decision.deleted'
   | 'agent.task.queued'
   | 'agent.task.running'
+  | 'agent.task.requested'
+  | 'agent.task.progressed'
+  | 'agent.task.awaiting_external_input'
   | 'agent.task.succeeded'
   | 'agent.task.failed';
 
@@ -71,9 +83,30 @@ export interface ActionItem {
 export interface RoomAgentTask {
   id: string;
   agent: RoomEvent['actor'];
-  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  status:
+    | 'queued'
+    | 'running'
+    | 'requested'
+    | 'progressed'
+    | 'awaiting_external_input'
+    | 'succeeded'
+    | 'failed';
   actionItems: ActionItem[];
+  skillId?: AgentTaskSkill;
+  phase?: AgentTaskPhase;
+  progressText?: string;
+  percent?: number;
+  summary?: string;
+  citations?: string[];
+  handoff?: AgentTaskHandoff;
   failureCode?: string;
+}
+
+export interface AgentTaskHandoff {
+  instruction: string;
+  url: string;
+  host: string;
+  expiresAt: string;
 }
 
 export interface RoomProjection {
@@ -106,7 +139,8 @@ export interface RpcRequest {
     | 'chat.send'
     | 'decision.propose'
     | 'decision.transition'
-    | 'decision.delete';
+    | 'decision.delete'
+    | 'agent.task.start';
   params: Record<string, unknown> & {
     contractVersion: typeof CONTRACT_VERSION;
     requestId: string;
@@ -124,6 +158,9 @@ const eventTypes = new Set<RoomEventType>([
   'decision.deleted',
   'agent.task.queued',
   'agent.task.running',
+  'agent.task.requested',
+  'agent.task.progressed',
+  'agent.task.awaiting_external_input',
   'agent.task.succeeded',
   'agent.task.failed',
 ]);
@@ -146,6 +183,105 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const received = Object.keys(value);
+  return received.length === keys.length && received.every((key) => keys.includes(key));
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && uuidPattern.test(value);
+}
+
+function isExternalTaskCore(value: unknown): value is Record<string, unknown> {
+  return (
+    isRecord(value) &&
+    isUuid(value.taskId) &&
+    value.agentId === REFERENCE_AGENT_ID &&
+    isUuid(value.requesterId) &&
+    AGENT_TASK_SKILLS.includes(value.skillId as AgentTaskSkill) &&
+    Number.isInteger(value.contextRevision) &&
+    (value.contextRevision as number) >= 0
+  );
+}
+
+function isCitationIds(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= 100 &&
+    value.every(isUuid) &&
+    new Set(value).size === value.length
+  );
+}
+
+function isActionItem(value: unknown): value is ActionItem {
+  if (!isRecord(value) || Object.keys(value).some((key) => !['text', 'owner', 'due'].includes(key))) {
+    return false;
+  }
+  return (
+    typeof value.text === 'string' && value.text.length > 0 && value.text.length <= 2000 &&
+    (value.owner === undefined || (typeof value.owner === 'string' && value.owner.length > 0 && value.owner.length <= 256)) &&
+    (value.due === undefined || (typeof value.due === 'string' && value.due.length > 0 && value.due.length <= 256))
+  );
+}
+
+function isExternalTaskResult(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value) || !isCitationIds(value.citations)) {
+    return false;
+  }
+  if (value.kind === 'context-summary.v1') {
+    return hasExactKeys(value, ['kind', 'summary', 'citations']) &&
+      typeof value.summary === 'string' && value.summary.length > 0 && value.summary.length <= 8000;
+  }
+  return value.kind === 'action-items.v1' &&
+    hasExactKeys(value, ['kind', 'actionItems', 'citations']) &&
+    Array.isArray(value.actionItems) && value.actionItems.length <= 20 && value.actionItems.every(isActionItem);
+}
+
+function isExternalTaskHandoff(value: unknown): value is AgentTaskHandoff {
+  if (!isRecord(value) || !hasExactKeys(value, ['instruction', 'url', 'host', 'expiresAt'])) {
+    return false;
+  }
+  if (
+    typeof value.instruction !== 'string' || value.instruction.length === 0 || value.instruction.length > 2000 ||
+    typeof value.url !== 'string' || typeof value.host !== 'string' || value.host.length === 0 || value.host.length > 253 ||
+    typeof value.expiresAt !== 'string' || Number.isNaN(Date.parse(value.expiresAt))
+  ) {
+    return false;
+  }
+  try {
+    const url = new URL(value.url);
+    return url.protocol === 'https:' && !url.username && !url.password && url.host === value.host;
+  } catch {
+    return false;
+  }
+}
+
+function isExternalTaskPayload(eventType: RoomEventType, payload: unknown): boolean {
+  if (!isExternalTaskCore(payload)) return false;
+  const coreKeys = ['taskId', 'agentId', 'requesterId', 'skillId', 'contextRevision'];
+  if (eventType === 'agent.task.requested') {
+    return hasExactKeys(payload, coreKeys);
+  }
+  if (eventType === 'agent.task.progressed') {
+    return hasExactKeys(payload, [...coreKeys, 'phase', 'text', 'percent'].filter((key) => key !== 'percent' || payload.percent !== undefined)) &&
+      ['accepted', 'retrieving-context', 'working', 'finalizing'].includes(payload.phase as string) &&
+      typeof payload.text === 'string' && payload.text.length > 0 && payload.text.length <= 512 &&
+      (payload.percent === undefined || (Number.isInteger(payload.percent) && (payload.percent as number) >= 0 && (payload.percent as number) <= 100));
+  }
+  if (eventType === 'agent.task.awaiting_external_input') {
+    return hasExactKeys(payload, [...coreKeys, 'handoff']) && isExternalTaskHandoff(payload.handoff);
+  }
+  if (eventType === 'agent.task.succeeded') {
+    return hasExactKeys(payload, [...coreKeys, 'result']) && isExternalTaskResult(payload.result);
+  }
+  if (eventType === 'agent.task.failed') {
+    return hasExactKeys(payload, [...coreKeys, 'failure']) && isRecord(payload.failure) &&
+      hasExactKeys(payload.failure, ['code']) &&
+      (payload.failure.code === 'invalid_task_input' || payload.failure.code === 'execution_failed');
+  }
+  return false;
+}
+
 export function isRoomEvent(value: unknown): value is RoomEvent {
   if (!isRecord(value) || !isRecord(value.actor) || !isRecord(value.payload)) {
     return false;
@@ -161,7 +297,7 @@ export function isRoomEvent(value: unknown): value is RoomEvent {
     return false;
   }
 
-  return (
+  const hasValidEnvelope = (
     value.contractVersion === CONTRACT_VERSION &&
     typeof value.requestId === 'string' &&
     typeof value.roomId === 'string' &&
@@ -174,6 +310,23 @@ export function isRoomEvent(value: unknown): value is RoomEvent {
     typeof value.actor.id === 'string' &&
     (value.actor.role === 'human' || value.actor.role === 'agent')
   );
+  if (!hasValidEnvelope) return false;
+
+  const eventType = value.eventType as RoomEventType;
+  if (!eventType.startsWith('agent.task.') || eventType === 'agent.task.queued' || eventType === 'agent.task.running') {
+    return true;
+  }
+  const isExternal = isExternalTaskPayload(eventType, value.payload);
+  const hasExternalActor = value.actor.id === REFERENCE_AGENT_ID && value.actor.role === 'agent';
+  if (
+    eventType === 'agent.task.requested' ||
+    eventType === 'agent.task.progressed' ||
+    eventType === 'agent.task.awaiting_external_input'
+  ) {
+    return isExternal && hasExternalActor;
+  }
+  if (isExternal) return hasExternalActor;
+  return !('skillId' in value.payload || 'contextRevision' in value.payload || value.payload.agentId === REFERENCE_AGENT_ID);
 }
 
 function isParticipant(value: unknown): value is RoomParticipant {
@@ -348,6 +501,43 @@ function fallbackDisplayName(actor: RoomActor): string {
   return `${actor.role === 'human' ? 'Human' : 'Agent'} ${actor.id.slice(0, 8)}`;
 }
 
+function readExternalTask(event: RoomEvent): RoomAgentTask | null {
+  if (
+    event.actor.id !== REFERENCE_AGENT_ID ||
+    event.actor.role !== 'agent' ||
+    !isExternalTaskPayload(event.eventType, event.payload)
+  ) return null;
+  const payload = event.payload;
+  const task: RoomAgentTask = {
+    id: payload.taskId as string,
+    agent: event.actor,
+    status: event.eventType.slice('agent.task.'.length) as RoomAgentTask['status'],
+    actionItems: [],
+    skillId: payload.skillId as AgentTaskSkill,
+  };
+  if (event.eventType === 'agent.task.progressed') {
+    task.phase = payload.phase as AgentTaskPhase;
+    task.progressText = payload.text as string;
+    task.percent = payload.percent as number | undefined;
+  }
+  if (event.eventType === 'agent.task.awaiting_external_input') {
+    task.handoff = payload.handoff as AgentTaskHandoff;
+  }
+  if (event.eventType === 'agent.task.succeeded') {
+    const result = payload.result as Record<string, unknown>;
+    task.citations = [...(result.citations as string[])];
+    if (result.kind === 'context-summary.v1') {
+      task.summary = result.summary as string;
+    } else {
+      task.actionItems = result.actionItems as ActionItem[];
+    }
+  }
+  if (event.eventType === 'agent.task.failed') {
+    task.failureCode = (payload.failure as Record<string, unknown>).code as string;
+  }
+  return task;
+}
+
 export function projectRoomParticipants(
   events: readonly RoomEvent[],
 ): RoomParticipant[] {
@@ -388,6 +578,27 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
           ...metadata,
         });
       }
+      continue;
+    }
+
+    if (event.eventType === 'agent.task.requested' ||
+      event.eventType === 'agent.task.progressed' ||
+      event.eventType === 'agent.task.awaiting_external_input' ||
+      (event.eventType === 'agent.task.succeeded' && 'skillId' in event.payload) ||
+      (event.eventType === 'agent.task.failed' && 'skillId' in event.payload)) {
+      const externalTask = readExternalTask(event);
+      if (!externalTask) continue;
+      const previous = tasks.get(externalTask.id);
+      tasks.set(externalTask.id, {
+        ...previous,
+        ...externalTask,
+        actionItems: externalTask.actionItems.length > 0 ? externalTask.actionItems : previous?.actionItems ?? [],
+        phase: externalTask.phase ?? previous?.phase,
+        progressText: externalTask.progressText ?? previous?.progressText,
+        percent: externalTask.percent ?? previous?.percent,
+        summary: externalTask.summary ?? previous?.summary,
+        citations: externalTask.citations ?? previous?.citations,
+      });
       continue;
     }
 
@@ -458,7 +669,10 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
   return {
     messages,
     decisions: [...decisions.values()],
-    tasks: [...tasks.values()],
+    tasks: [...tasks.values()].map((task) => ({
+      ...task,
+      citations: task.citations?.filter((citation) => events.some((event) => event.eventId === citation)),
+    })),
     participants: projectRoomParticipants(events),
   };
 }

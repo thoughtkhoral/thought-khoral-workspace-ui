@@ -88,6 +88,13 @@ export function ChatStream({
     return <>{fragments}</>;
   };
 
+  const focusCitation = (eventId: string) => {
+    const citedEvent = document.getElementById(eventId);
+    if (!citedEvent) return;
+    citedEvent.scrollIntoView({ block: 'center' });
+    citedEvent.focus({ preventScroll: true });
+  };
+
   return (
     <Chatbot
       displayMode={ChatbotDisplayMode.embedded}
@@ -123,11 +130,31 @@ export function ChatStream({
               </Message>
           ))}
           {tasks.map((task) => (
-            <div key={task.id} role="status" aria-label={`Action Items ${task.status}`} className="thought-khoral-agent-task">
-              <strong>Action Items: {task.status}</strong>
+            <section key={task.id} role="status" aria-label={`Reference Agent task ${task.status}`} className="thought-khoral-agent-task">
+              <strong>{task.skillId ? `Reference Agent: ${task.skillId}` : 'Action Items'}: {task.status}</strong>
+              {task.phase && <div>Phase: {task.phase}</div>}
+              {task.progressText && <div>{task.progressText}{task.percent !== undefined ? ` (${task.percent}%)` : ''}</div>}
+              {task.summary && <p>{task.summary}</p>}
               {task.actionItems.map((item) => <div key={item.text}>{item.text}{item.owner ? ` — ${item.owner}` : ''}{item.due ? ` (${item.due})` : ''}</div>)}
+              {task.citations && task.citations.length > 0 && (
+                <div className="thought-khoral-agent-task-citations">
+                  {task.citations.map((citation, index) => (
+                    <button type="button" key={citation} onClick={() => focusCitation(citation)}>
+                      Citation {index + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {task.handoff && (
+                <div>
+                  <p>{task.handoff.instruction}</p>
+                  <a href={task.handoff.url} target="_blank" rel="noopener noreferrer">
+                    Continue at {task.handoff.host}
+                  </a>
+                </div>
+              )}
               {task.failureCode && <div>Task failed: {task.failureCode}</div>}
-            </div>
+            </section>
           ))}
         </MessageBox>
       </ChatbotContent>

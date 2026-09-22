@@ -56,3 +56,16 @@
   color: var(--pf-t--global--text--color--subtle);
   font-size: var(--pf-t--global--font--size--sm);
 }
+
+.thought-khoral-agent-task,
+.thought-khoral-agent-task-composer {
+  display: grid;
+  gap: var(--pf-t--global--spacer--sm);
+  padding: var(--pf-t--global--spacer--md);
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+}
+
+.thought-khoral-agent-task-citations {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm);
+}

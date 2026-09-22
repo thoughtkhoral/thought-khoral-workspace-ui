@@ -251,3 +251,124 @@ describe('gateway error mapping', () => {
     });
   });
 });
+
+describe('external agent task projection', () => {
+  const taskId = '84000000-0000-4000-8000-000000000001';
+  const citationId = '83000000-0000-4000-8000-000000000001';
+  const externalAgentId = '74686f75-6768-746b-686f-72616c000003';
+  const requested: RoomEvent = {
+    ...messageEvent,
+    sequence: 2,
+    eventId: '82000000-0000-4000-8000-000000000001',
+    eventType: 'agent.task.requested',
+    actor: { id: externalAgentId, role: 'agent', displayName: 'Reference Agent' },
+    payload: {
+      taskId,
+      agentId: externalAgentId,
+      requesterId: '85000000-0000-4000-8000-000000000001',
+      skillId: 'summarize-context',
+      contextRevision: 4,
+    },
+  };
+
+  it('projects requested, progressed, and successful context summaries with persisted citations', () => {
+    const progressed: RoomEvent = {
+      ...requested,
+      sequence: 3,
+      eventId: '82000000-0000-4000-8000-000000000002',
+      eventType: 'agent.task.progressed',
+      payload: {
+        ...requested.payload,
+        phase: 'working',
+        text: 'Summarizing the room context.',
+        percent: 75,
+      },
+    };
+    const succeeded: RoomEvent = {
+      ...requested,
+      sequence: 4,
+      eventId: '82000000-0000-4000-8000-000000000003',
+      eventType: 'agent.task.succeeded',
+      payload: {
+        ...requested.payload,
+        result: {
+          kind: 'context-summary.v1',
+          summary: 'The room agreed to ship the gateway foundation.',
+          citations: [citationId],
+        },
+      },
+    };
+    const citedMessage: RoomEvent = { ...messageEvent, eventId: citationId };
+
+    expect(projectRoomEvents([requested, progressed, succeeded, citedMessage]).tasks).toEqual([
+      expect.objectContaining({
+        id: taskId,
+        status: 'succeeded',
+        skillId: 'summarize-context',
+        phase: 'working',
+        progressText: 'Summarizing the room context.',
+        percent: 75,
+        summary: 'The room agreed to ship the gateway foundation.',
+        citations: [citationId],
+      }),
+    ]);
+  });
+
+  it('rejects malformed external task events instead of projecting unsafe data', () => {
+    const malformed: RoomEvent = {
+      ...requested,
+      eventType: 'agent.task.awaiting_external_input',
+      payload: {
+        ...requested.payload,
+        handoff: {
+          instruction: 'Continue outside the room.',
+          url: 'https://example.test/continue',
+          host: 'different.example.test',
+          expiresAt: '2026-09-22T13:00:00Z',
+        },
+      },
+    };
+
+    expect(isRoomEvent(malformed)).toBe(false);
+    expect(projectRoomEvents([malformed]).tasks).toEqual([]);
+  });
+
+  it('projects requested, progressed, and successful action item extraction', () => {
+    const requestedAction: RoomEvent = {
+      ...requested,
+      payload: { ...requested.payload, skillId: 'extract-action-items' },
+    };
+    const progressed: RoomEvent = {
+      ...requestedAction,
+      sequence: 3,
+      eventType: 'agent.task.progressed',
+      payload: {
+        ...requestedAction.payload,
+        phase: 'retrieving-context',
+        text: 'Reviewing the persisted discussion.',
+      },
+    };
+    const succeeded: RoomEvent = {
+      ...requestedAction,
+      sequence: 4,
+      eventType: 'agent.task.succeeded',
+      payload: {
+        ...requestedAction.payload,
+        result: {
+          kind: 'action-items.v1',
+          actionItems: [{ text: 'Prepare rollout checklist', owner: 'Maya' }],
+          citations: [],
+        },
+      },
+    };
+
+    expect(projectRoomEvents([requestedAction, progressed, succeeded]).tasks).toEqual([
+      expect.objectContaining({
+        status: 'succeeded',
+        skillId: 'extract-action-items',
+        phase: 'retrieving-context',
+        actionItems: [{ text: 'Prepare rollout checklist', owner: 'Maya' }],
+      }),
+    ]);
+  });
+});

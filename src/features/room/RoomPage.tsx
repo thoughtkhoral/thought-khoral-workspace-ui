@@ -28,6 +28,7 @@ import type { DecisionCreateValues } from '../decisions/DecisionCreateForm';
 import type { DecisionEditTransition } from '../decisions/DecisionEditForm';
 import { MemoryDrawer } from '../decisions/MemoryDrawer';
 import { ParticipantDrawer } from '../participants/ParticipantDrawer';
+import { AgentTaskComposer } from './AgentTaskComposer';
 import {
   useRoomSocket,
   type AuthenticatedSocketFactory,
@@ -75,7 +76,7 @@ export function RoomPage({
       }
     >(),
   );
-  const { events, participants, error, status, send } = useRoomSocket({
+  const { events, participants, error, status, send, sendRequest } = useRoomSocket({
     roomId: activeRoomId,
     getAccessToken,
     createSocket,
@@ -86,6 +87,7 @@ export function RoomPage({
     participants.length > 0 ? participants : room.participants;
   const isConnected = status === 'connected';
   const canManageDecisions = participantRole === 'human';
+  const canStartAgentTasks = participantRole === 'human';
 
   const rememberMutation = (
     requestId: string | false,
@@ -253,6 +255,15 @@ export function RoomPage({
                     onSendMessage={(values) => send('chat.send', values)}
                   />
                 </StackItem>
+                {canStartAgentTasks && (
+                  <StackItem>
+                    <AgentTaskComposer
+                      roomId={activeRoomId}
+                      isConnected={isConnected}
+                      onStart={sendRequest}
+                    />
+                  </StackItem>
+                )}
                 <StackItem>
                   <Title headingLevel="h2">Decisions</Title>
                 </StackItem>

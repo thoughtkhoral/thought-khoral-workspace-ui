@@ -237,25 +237,38 @@ export function useRoomSocket({
     };
   }, [appendEvents, createSocket, getAccessToken, reconnectDelayMs, roomId, url]);
 
-  const send = useCallback(
-    (
-      method: Exclude<RpcRequest['method'], 'room.join'>,
-      params: object,
-    ) => {
+  const sendRequest = useCallback(
+    (request: RpcRequest) => {
       const socket = socketRef.current;
-      if (!roomId || !socket || socket.readyState !== WebSocket.OPEN) {
+      if (!roomId || request.params.roomId !== roomId || !socket || socket.readyState !== WebSocket.OPEN) {
         setError({
           code: -32603,
           message: 'The gateway could not complete the request.',
         });
         return false;
       }
-      const request = createRpcRequest(method, roomId, { ...params });
       socket.send(JSON.stringify(request));
       return request.params.requestId;
     },
     [roomId],
   );
 
-  return { events, participants, error, status, lastSequence, send };
+  const send = useCallback(
+    (
+      method: Exclude<RpcRequest['method'], 'room.join'>,
+      params: object,
+    ) => {
+      if (!roomId) {
+        setError({
+          code: -32603,
+          message: 'The gateway could not complete the request.',
+        });
+        return false;
+      }
+      return sendRequest(createRpcRequest(method, roomId, { ...params }));
+    },
+    [roomId, sendRequest],
+  );
+
+  return { events, participants, error, status, lastSequence, send, sendRequest };
 }

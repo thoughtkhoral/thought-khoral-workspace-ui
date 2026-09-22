@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import type { RoomParticipant } from '../../api';
+import type { RoomAgentTask, RoomParticipant } from '../../api';
 import { ChatStream } from './ChatStream';
 
 const participants: RoomParticipant[] = [
@@ -17,6 +17,8 @@ function inputFor(container: HTMLElement) {
 }
 
 describe('ChatStream', () => {
+  afterEach(cleanup);
+
   beforeAll(() => {
     vi.stubGlobal(
       'ResizeObserver',
@@ -26,6 +28,77 @@ describe('ChatStream', () => {
         unobserve() {}
       },
     );
+  });
+
+  it('renders a safe external task card with phase, result, and citation controls', async () => {
+    const user = userEvent.setup();
+    const citationId = '83000000-0000-4000-8000-000000000001';
+    const scrollIntoView = vi.fn();
+    const focus = vi.fn();
+    const tasks: RoomAgentTask[] = [{
+      id: '84000000-0000-4000-8000-000000000001',
+      agent: { id: '74686f75-6768-746b-686f-72616c000003', role: 'agent' },
+      status: 'succeeded',
+      actionItems: [],
+      skillId: 'summarize-context',
+      phase: 'finalizing',
+      summary: 'The room agreed to ship the gateway foundation.',
+      citations: [citationId],
+    }];
+    render(
+      <>
+        <div id={citationId} tabIndex={-1} ref={(element) => {
+          if (element) {
+            element.scrollIntoView = scrollIntoView;
+            element.focus = focus;
+          }
+        }} />
+        <ChatStream
+          isConnected
+          messages={[]}
+          tasks={tasks}
+          participants={participants}
+          onSendMessage={() => undefined}
+        />
+      </>,
+    );
+
+    const taskCard = screen.getByRole('status', { name: /reference agent task succeeded/i });
+    expect(taskCard.textContent).toContain('finalizing');
+    expect(taskCard.textContent).toContain('The room agreed to ship the gateway foundation.');
+    await user.click(within(taskCard).getByRole('button', { name: /citation 1/i }));
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it('renders handoffs only as explicit safe human-click links', () => {
+    const tasks: RoomAgentTask[] = [{
+      id: '84000000-0000-4000-8000-000000000001',
+      agent: { id: '74686f75-6768-746b-686f-72616c000003', role: 'agent' },
+      status: 'awaiting_external_input',
+      actionItems: [],
+      skillId: 'extract-action-items',
+      handoff: {
+        instruction: 'Sign in to continue.',
+        url: 'https://handoff.example.test/continue',
+        host: 'handoff.example.test',
+        expiresAt: '2026-09-22T13:00:00Z',
+      },
+    }];
+    render(
+      <ChatStream
+        isConnected
+        messages={[]}
+        tasks={tasks}
+        participants={participants}
+        onSendMessage={() => undefined}
+      />,
+    );
+
+    const handoff = screen.getByRole('link', { name: /continue at handoff\.example\.test/i });
+    expect(handoff.getAttribute('target')).toBe('_blank');
+    expect(handoff.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(handoff.textContent).toContain('handoff.example.test');
   });
 
   it('renders the PatternFly room conversation', () => {
