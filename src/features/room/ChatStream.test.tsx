@@ -49,6 +49,7 @@ describe('ChatStream', () => {
     for (const event of events) {
       const source = document.getElementById(event.eventId);
       expect(source).not.toBeNull();
+      expect(source!.getAttribute('tabindex')).toBe('-1');
       source!.scrollIntoView = vi.fn();
     }
     await user.click(screen.getByRole('button', {name: 'Citation 1'}));

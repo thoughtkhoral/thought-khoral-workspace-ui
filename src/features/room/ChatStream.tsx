@@ -115,6 +115,7 @@ export function ChatStream({
             <Message
               key={message.eventId}
               id={message.eventId}
+              tabIndex={-1}
               role={message.actor.role === 'human' ? 'user' : 'bot'}
               alignment={message.actor.role === 'human' ? 'end' : 'start'}
               name={
