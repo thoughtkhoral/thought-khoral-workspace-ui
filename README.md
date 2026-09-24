@@ -41,6 +41,17 @@ transcript.
 See the [local specification index](.ai/specs/README.md) and the
 [repository map](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/repository-map.md).
 
+## Local reference-agent tasks
+
+In a joined room, a human can explicitly start either `summarize-context` or
+`extract-action-items` for the pinned local A2A reference agent. The transcript
+shows room-persisted progress and a cited terminal result. If an agent task
+requires external human input, the UI shows its instruction and validated
+HTTPS link for the user to choose; it does not open that page automatically or
+host the agent's input flow. The UI does not invoke A2A directly or admit
+arbitrary remote agents. The earlier `@action-items` mention path remains a
+separate in-process deterministic task.
+
 ## Contributing
 
 Start with an issue in this repository. UI changes must reference the accepted

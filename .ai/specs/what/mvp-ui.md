@@ -25,6 +25,11 @@
 - The UI renders normalized agent-task lifecycle events as room-visible,
   agent-attributed task cards and discovers registered executable agents through
   the existing participant/mention interaction.
+- For the local A2A reference agent, a human may explicitly choose
+  `summarize-context` or `extract-action-items` and start a task. The UI shows
+  server-produced progress, source-cited terminal results, and any validated
+  external-input instruction and HTTPS link; it does not open or embed the
+  agent's human-in-the-loop experience automatically.
 - A human viewing a draft decision can invoke Confirm, Edit, or Dismiss; an agent sees no decision-transition control.
 - The active collective-memory view is read-only and shows only decisions that the gateway has made active.
 - The conversation roster opens as a PatternFly start-side overlay drawer and lists every known human and agent with its trusted display name, role, and explicit Online or Offline state.
@@ -51,7 +56,8 @@ interface ThoughtKhoralWorkspaceBootstrap {
 
 It consumes authenticated retained-v1 room events and participant
 snapshots/updates, and uses `room.join`, `chat.send`, and
-`decision.transition` JSON-RPC requests through the gateway WebSocket only
+`decision.transition` and human `agent.task.start` JSON-RPC requests through
+the gateway WebSocket only
 after explicit entry. Renaming the browser bootstrap namespace does not change
 the host-provided access-token acquisition or authenticated socket behavior,
 including its `session.authenticate` exchange.

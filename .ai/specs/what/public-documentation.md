@@ -16,4 +16,7 @@ UI relates to the authenticated gateway and versioned room contract.
   integration expectations, and the local specification index.
 - Documentation states that the gateway owns authentication, authorization,
   persistence, and authoritative decision transitions.
+- Documentation explains the explicit local A2A task composer, visible
+  progress, source citations, and user-clicked external handoff without
+  presenting the UI as an A2A client or external human-in-the-loop host.
 - Changes follow the organization issue-first contribution workflow.

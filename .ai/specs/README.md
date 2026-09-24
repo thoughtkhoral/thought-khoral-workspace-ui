@@ -18,5 +18,5 @@ The UI owns the unjoined/joined presentation and explicit Enter/Leave
 controls. The platform owns the host bootstrap and non-secret room URL binding;
 the gateway remains an unchanged retained-v1 compatibility boundary with no
 `room.leave` RPC. See the corresponding [platform lifecycle
-specification](https://github.com/thoughtkhoral/thought-khoral/blob/main/thought-khoral-platform/.ai/specs/what/local-mvp.md)
+specification](https://github.com/thoughtkhoral/thought-khoral-platform/blob/main/.ai/specs/what/local-mvp.md)
 and [gateway specification](https://github.com/thoughtkhoral/thought-khoral-room-gateway/blob/main/.ai/specs/what/mvp-room.md).
