@@ -31,6 +31,10 @@
   external-input instruction and HTTPS link; it does not open or embed the
   agent's human-in-the-loop experience automatically.
 - A human viewing a draft decision can invoke Confirm, Edit, or Dismiss; an agent sees no decision-transition control.
+- A human can enter the exact `/decisions` command to open local Create,
+  Update, Delete, or Cancel controls. The command itself is not sent as chat;
+  Delete requires confirmation, and a successful mutation produces one room
+  result message only after the matching persisted event. Cancel is silent.
 - The active collective-memory view is read-only and shows only decisions that the gateway has made active.
 - The conversation roster opens as a PatternFly start-side overlay drawer and lists every known human and agent with its trusted display name, role, and explicit Online or Offline state.
 - The production document title, workspace heading, and accessibility labels identify the product as ThoughtKhoral.
@@ -55,12 +59,16 @@ interface ThoughtKhoralWorkspaceBootstrap {
 ```
 
 It consumes authenticated retained-v1 room events and participant
-snapshots/updates, and uses `room.join`, `chat.send`, and
-`decision.transition` and human `agent.task.start` JSON-RPC requests through
-the gateway WebSocket only
+snapshots/updates, and uses `room.join`, `chat.send`, `decision.propose`,
+`decision.transition`, `decision.delete`, and human `agent.task.start`
+JSON-RPC requests through the gateway WebSocket only
 after explicit entry. Renaming the browser bootstrap namespace does not change
 the host-provided access-token acquisition or authenticated socket behavior,
 including its `session.authenticate` exchange.
+
+Root [decision 008](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/008-slash-decisions-and-facilitator-boundary.md)
+governs the human slash-decisions workflow and leaves the gateway authoritative
+for deletion, audit history, and active context.
 
 The host callbacks are lifecycle notifications and room-URL binding hooks;
 they do not replace gateway protocol methods and do not carry credentials.

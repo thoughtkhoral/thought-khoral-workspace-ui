@@ -41,6 +41,15 @@ transcript.
 See the [local specification index](.ai/specs/README.md) and the
 [repository map](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/repository-map.md).
 
+## Decision workflow
+
+In a joined room, a human can enter `/decisions` to open Create, Update,
+Delete, or Cancel controls. The command itself is not posted to chat. Delete
+requires confirmation; a successful mutation posts one result after the
+gateway persists its event. Cancel and failed mutations post no result.
+Agents do not receive decision-mutation controls, and `Decision:` chat text
+does not create a proposal automatically.
+
 ## Local reference-agent tasks
 
 In a joined room, a human can explicitly start either `summarize-context` or

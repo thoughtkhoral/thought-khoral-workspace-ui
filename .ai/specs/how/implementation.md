@@ -41,6 +41,20 @@ covered by the static-preview smoke check below, and synchronizes React updates
 and token resolution rather than depending on a short wall-clock wait that can
 expire under parallel load.
 
+## Human slash-decisions workflow
+
+Per root [decision 008](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/008-slash-decisions-and-facilitator-boundary.md),
+the joined human composer consumes the exact `/decisions` command locally and
+opens Create, Update, Delete, and Cancel controls. Create may submit an empty
+`sourceEventIds` list; Update selects a draft; Delete selects an existing
+decision and requires confirmation. The UI sends the corresponding governed
+RPC only for an explicit human action. It correlates the request ID with the
+normalized persisted event before posting one room-wide result message;
+Cancel, failed requests, and the command itself produce no chat message. The
+gateway alone enforces authorization, physical deletion, immutable audit
+history, and active-context transitions. Messages beginning with `Decision:`
+remain ordinary chat and are not a UI proposal shortcut.
+
 ## Agent task projection
 
 Per root [decision 006](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/006-agent-task-dispatch.md), the UI consumes additive server-produced agent-task lifecycle events. It projects one card per task in the transcript using gateway-normalized provenance, status, safe failure data, and structured action items. The UI does not dispatch or synthesize task lifecycle events; it only exposes the registered Action Items Agent through the existing participant roster and mention composer.
