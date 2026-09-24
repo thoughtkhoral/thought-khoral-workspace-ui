@@ -41,6 +41,22 @@ covered by the static-preview smoke check below, and synchronizes React updates
 and token resolution rather than depending on a short wall-clock wait that can
 expire under parallel load.
 
+## Mention-aware chat composition
+
+The joined composer derives canonical mention options from the known roster:
+normalize display names to lowercase ASCII hyphenated tokens, reserve
+`allhumans` and `allagents` for aliases, and add deterministic participant-ID
+suffixes for duplicate or reserved names. Autocomplete inserts the whole
+token. Only complete, syntactically bounded `@token` occurrences become typed
+targets; email-like text and unfinished tokens do not. The UI deduplicates
+repeated tokens and blocks Send for unknown or stale tokens, more than 50
+unique targets, or mentioned-only delivery without a target. It then sends
+`chat.send` with typed `mentions` and
+the chosen `delivery`. It renders persisted mentions and targeted labels as
+accessible text, without interpreting message text as HTML. The gateway is
+authoritative for the final roster check and audience under the root
+[message delivery design](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/message-mentions-and-delivery.md).
+
 ## Human slash-decisions workflow
 
 Per root [decision 008](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/008-slash-decisions-and-facilitator-boundary.md),

@@ -22,6 +22,12 @@
   room. Keycloak SSO may skip the password form, but that does not count as
   room membership or room entry.
 - The UI renders normalized room messages and decision events from the gateway.
+- In a joined room, the composer offers known human and agent participants and
+  the fixed `@allhumans` and `@allagents` aliases. A human can choose the
+  default room-wide delivery or mentioned-only delivery, which includes the
+  sender; the UI blocks unresolved targets, an empty mentioned-only audience,
+  and more than 50 unique targets. Delivered mentions and targeted-delivery
+  labels are accessible in the transcript.
 - The UI renders normalized agent-task lifecycle events as room-visible,
   agent-attributed task cards and discovers registered executable agents through
   the existing participant/mention interaction.
@@ -65,6 +71,11 @@ JSON-RPC requests through the gateway WebSocket only
 after explicit entry. Renaming the browser bootstrap namespace does not change
 the host-provided access-token acquisition or authenticated socket behavior,
 including its `session.authenticate` exchange.
+
+For `chat.send`, the UI sends typed mention targets and `room` or `mentioned`
+delivery. It uses roster-derived canonical tokens for participant targets;
+the gateway remains authoritative for target validation, audience resolution,
+live delivery, and replay under the root [message delivery design](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/message-mentions-and-delivery.md).
 
 Root [decision 008](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/008-slash-decisions-and-facilitator-boundary.md)
 governs the human slash-decisions workflow and leaves the gateway authoritative

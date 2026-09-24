@@ -24,6 +24,11 @@ the authenticated gateway and the local platform's OIDC configuration; the UI
 does not own identity validation, persistence, or authoritative decision
 transitions.
 
+The UI implements the retained v1 room request and event interface. Its
+protocol constant is a compatibility value, while the contracts repository
+owns the schemas and the gateway enforces authorization. Update the UI against
+a reviewed contract revision before relying on new fields or events.
+
 ## Message mentions and delivery
 
 In a connected room, type `@` in the message composer to select known human or
