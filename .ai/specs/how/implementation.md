@@ -32,6 +32,15 @@ These callbacks may update a non-secret room URL binding, but must not clear or
 log OIDC tokens. The UI does not add `room.leave`, durable membership, kick,
 history deletion, or any client-side authoritative event persistence.
 
+The room-entry regression test must distinguish the synchronous explicit-entry
+callback from the asynchronous authenticated socket setup. It must verify that
+neither occurs before confirmation, that confirmation supplies the selected
+room ID to the callback, and that the resulting socket sends `room.join` for
+that ID. The focused test isolates the lazy chat view, whose production path is
+covered by the static-preview smoke check below, and synchronizes React updates
+and token resolution rather than depending on a short wall-clock wait that can
+expire under parallel load.
+
 ## Agent task projection
 
 Per root [decision 006](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/decisions/006-agent-task-dispatch.md), the UI consumes additive server-produced agent-task lifecycle events. It projects one card per task in the transcript using gateway-normalized provenance, status, safe failure data, and structured action items. The UI does not dispatch or synthesize task lifecycle events; it only exposes the registered Action Items Agent through the existing participant roster and mention composer.

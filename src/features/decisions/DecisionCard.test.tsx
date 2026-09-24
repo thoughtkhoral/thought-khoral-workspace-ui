@@ -395,34 +395,6 @@ describe('RoomPage governance', () => {
     expect(createSocket).not.toHaveBeenCalled();
   });
 
-  it('enters the suggested room only after explicit confirmation', async () => {
-    const socket = new FakeRoomSocket();
-    const createSocket = vi.fn(() => socket);
-    const onEnterRoom = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <RoomPage
-        {...({
-          roomId: validRoomId,
-          participantRole: 'human',
-          getAccessToken: async () => 'opaque-access-token',
-          createSocket,
-          onEnterRoom,
-        } as any)}
-      />
-    );
-
-    expect(createSocket).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Enter room' }));
-    await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
-    act(() => socket.open());
-
-    expect(JSON.parse(socket.sent[0]!).method).toBe('room.join');
-    expect(JSON.parse(socket.sent[0]!).params.roomId).toBe(validRoomId);
-    expect(onEnterRoom).toHaveBeenCalledWith(validRoomId);
-  });
-
   it('leaves the room, cancels reconnect, and returns to the unjoined state', async () => {
     const socket = new FakeRoomSocket();
     const createSocket = vi.fn(() => socket);
