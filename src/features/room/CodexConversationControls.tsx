@@ -31,8 +31,10 @@ export function CodexConversationControls({
   const model = conversation.catalog?.data.find(option => option.id === chosen?.model);
   const effective = conversation.pendingConfirmation
     ? null
-    : conversation.task?.effectiveSettings ?? state?.effectiveSettings;
-  const usage = conversation.task?.usage ?? state?.usage;
+    : conversation.task ? conversation.task.effectiveSettings : state?.effectiveSettings;
+  const usage = conversation.pendingConfirmation
+    ? null
+    : conversation.task ? conversation.task.usage : state?.usage;
   const unavailable = !conversation.isAvailable;
   const disableControls = conversation.busy || unavailable;
   const contextEstimate = usage && usage.freshness !== 'unavailable' && usage.modelContextWindow

@@ -5,6 +5,7 @@ import accepted from './__fixtures__/accepted-turn.json';
 import ready from './__fixtures__/ready-view.json';
 import catalog from './__fixtures__/catalog.json';
 import completed from './__fixtures__/completed-task.json';
+import failed from '../../../contracts/agent-conversation-v1/fixtures/valid/failed-task.json';
 import invalidReady from '../../../contracts/agent-conversation-v1/fixtures/invalid/ready-active-task.json';
 import duplicateOrdinal from '../../../contracts/agent-conversation-v1/fixtures/invalid/duplicate-update-ordinal.json';
 import duplicateMention from '../../../contracts/agent-conversation-v1/fixtures/invalid/duplicate-mention-id.json';
@@ -37,6 +38,17 @@ it('parses the exact browser schemas and binds responses to the requested room a
   await expect(api.getConversation('t', ready.roomId, ready.agentId)).rejects.toThrow('unexpected');
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respond(ready)));
   await expect(api.getConversation('t', turn.roomId, ready.agentId)).rejects.toThrow('unexpected');
+});
+it('accepts the published failed task and rejects a mismatched terminal failure code', async () => {
+  const http = vi.fn().mockResolvedValue(respond(failed));
+  vi.stubGlobal('fetch', http);
+  const api = createConversationApi();
+  expect(await api.getTask('t', failed.roomId, failed.taskId)).toEqual(failed);
+  http.mockResolvedValue(respond({
+    ...failed,
+    failure: { ...failed.failure, code: 'conversation_interrupted' }
+  }));
+  await expect(api.getTask('t', failed.roomId, failed.taskId)).rejects.toThrow('unexpected');
 });
 it('paginates with browser opaque cursors, rejecting duplicate models and unsupported defaults', async () => {
   const http = vi.fn().mockResolvedValue(respond(catalog));
@@ -100,6 +112,22 @@ it('rejects falsely confirmed settings and fresh telemetry without a usable deno
   for (const conversation of [{ ...ready.conversation, effectiveSettings: { ...ready.conversation.effectiveSettings, reasoningEffort: null } }, { ...ready.conversation, usage: { ...ready.conversation.usage, modelContextWindow: null } }]) {
     http.mockResolvedValue(respond({ ...ready, conversation }));
     await expect(api.getConversation('t', ready.roomId, ready.agentId)).rejects.toThrow('unexpected');
+  }
+});
+it('permits null context windows only when usage is unavailable', async () => {
+  const http = vi.fn();
+  vi.stubGlobal('fetch', http);
+  const api = createConversationApi();
+  const usage = { ...ready.conversation.usage, modelContextWindow: null, freshness: 'stale' };
+  http.mockResolvedValue(respond({ ...ready, conversation: { ...ready.conversation, usage } }));
+  await expect(api.getConversation('t', ready.roomId, ready.agentId)).rejects.toThrow('unexpected');
+  for (const validUsage of [
+    { ...usage, freshness: 'unavailable' },
+    { ...usage, modelContextWindow: 1000 }
+  ]) {
+    const view = { ...ready, conversation: { ...ready.conversation, usage: validUsage } };
+    http.mockResolvedValue(respond(view));
+    expect(await api.getConversation('t', ready.roomId, ready.agentId)).toEqual(view);
   }
 });
 it('requires the profile HTTP success status for each response variant', async () => {

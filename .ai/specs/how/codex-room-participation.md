@@ -144,3 +144,36 @@ Vite large-chunk advisory remains; no broad chunk restructuring is included.
 These checks establish browser behavior with synthetic responses, not live
 provider, browser-to-broker deployment, room-history disclosure, sandbox or
 egress coverage. Provider use and service activation remain gated separately.
+
+### Independent review correction checkpoint
+
+Task 7 review round 1 corrected the failed terminal update projection: its
+closed `{code}` data is compared with the failure code, while the failure's
+diagnostic message is never displayed. Completed updates retain full semantic
+result comparison, independent of JSON object member order and with ordered
+arrays. The browser's discriminated update type now represents each published
+update variant, including the failed update's code-only shape.
+
+A binding-matched current task is authoritative for effective settings and
+usage, including null metadata. Pending acceptance also suppresses prior-turn
+usage. A model change therefore remains unconfirmed and its estimate unavailable
+until that task supplies metadata; a previous confirmed model and fresh estimate
+cannot be restored by null fallback. Strict metadata parsing additionally allows
+a null model context window only when freshness is `unavailable`.
+
+Direct-address classification excludes matching backtick delimiter runs and
+backtick or tilde fenced code. Shorter fence runs do not close a longer fence.
+These drafts remain ordinary chat; an explicitly selected Codex target still
+inserts the canonical typed mention outside the quoted/code text. This browser
+classification correction preserves the existing broker authorization boundary
+and the host admission handoff above.
+
+Six new regressions first failed on the reviewed implementation and then passed:
+the immutable published failed TaskView, timeout/interruption recovery with
+explicit New session, a new model's pending/null metadata followed by its own
+confirmation, Markdown code routing through the real composer, and paired
+null/unavailable versus positive/stale context-window parsing. Final verification
+passed 116 tests in 12 files, the production build, and the visible room preview
+with 19 retained ChatStream tests. The 135-file artifact pin and tamper checks
+passed; npm audit reported zero vulnerabilities. The existing large-chunk build
+advisory and the deployment/provider verification limits above remain unchanged.

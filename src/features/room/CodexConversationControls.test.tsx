@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CodexConversationControls } from './CodexConversationControls';
 import { MentionComposer } from './MentionComposer';
@@ -7,8 +7,11 @@ import { CODEX_AGENT_ID, createConversationApi } from './conversationApi';
 import ready from './__fixtures__/ready-view.json';
 import catalog from './__fixtures__/catalog.json';
 import accepted from './__fixtures__/accepted-turn.json';
+import reserved from './__fixtures__/reserved-task.json';
+import failed from '../../../contracts/agent-conversation-v1/fixtures/valid/failed-task.json';
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 const participants = [{
@@ -107,6 +110,33 @@ it('selected target adds a canonical typed mention; aliases and quoted mentions 
   await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
   expect(requests.find(r => r.body)!.body!.text).toBe('@codex-agent hello');
 });
+it('keeps delimiter-run code spans and fenced code in ordinary chat unless the target is selected', async () => {
+  const requests = boundary();
+  const chat = vi.fn();
+  render(<Harness onChat={chat} />);
+  await screen.findByRole('combobox', { name: 'Model' });
+  const codeDrafts = [
+    '``@codex-agent`` code',
+    '``code with ` @codex-agent ` inside``',
+    '~~~javascript\n@codex-agent\n~~~',
+    '````text\n@codex-agent\n```\n@codex-agent\n````'
+  ];
+  for (const text of codeDrafts) {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: text } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe(''));
+  }
+  expect(chat.mock.calls.map(([values]) => values.text)).toEqual(codeDrafts);
+  expect(requests.filter(request => request.body)).toHaveLength(0);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Conversation target' }), { target: { value: CODEX_AGENT_ID } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: codeDrafts[0] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(request => request.body)).toHaveLength(1));
+  expect(requests.find(request => request.body)!.body!.text).toBe(`@codex-agent ${codeDrafts[0]}`);
+  expect(requests.find(request => request.body)!.body!.mentions).toEqual([
+    { type: 'participant', id: CODEX_AGENT_ID, token: 'codex-agent' }
+  ]);
+});
 it('rejects targeted Codex delivery and preserves drafts on busy rejection', async () => {
   const requests = boundary({ busy: true });
   render(<Harness />);
@@ -180,4 +210,104 @@ it('shows zero usage, stale usage and unavailable metadata with their freshness'
     await screen.findByText(expected);
     cleanup();
   }
+});
+async function flushBoundary() {
+  await act(async () => {
+    for (let index = 0; index < 30; index++) await Promise.resolve();
+  });
+}
+
+it.each([
+  ['timeout', /turn timed out/],
+  ['conversation_interrupted', /turn was interrupted/]
+] as const)('shows safe %s failure and permits explicit new-session recovery', async (code, expected) => {
+  vi.useFakeTimers();
+  let terminal = false;
+  const requests: Record<string, unknown>[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.body) {
+      requests.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ ...accepted, generation: 2 }), { status: 202 });
+    }
+    if (url.includes('/models')) return new Response(JSON.stringify(catalog));
+    if (url.includes('/tasks/')) {
+      terminal = true;
+      return new Response(JSON.stringify({
+        ...failed,
+        updates: [{ ...failed.updates[0], data: { code } }],
+        failure: { code, message: 'synthetic private provider trace' }
+      }));
+    }
+    return new Response(JSON.stringify({
+      ...ready,
+      conversation: {
+        ...ready.conversation,
+        state: terminal ? 'unusable' : 'running',
+        activeTaskId: terminal ? null : failed.taskId
+      }
+    }));
+  }));
+  render(<Harness />);
+  await flushBoundary();
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(screen.getByRole('alert').textContent).toMatch(expected);
+  expect(screen.queryByText(/synthetic private provider trace/)).toBeNull();
+  expect(screen.getByRole('status').textContent).toBe('Codex turn: failed');
+  expect((screen.getByRole('button', { name: 'New session' }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.queryByRole('button', { name: 'Continue session' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'New session' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent recover' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await flushBoundary();
+  expect(requests).toHaveLength(1);
+  expect(requests[0]!.conversation).toEqual({ mode: 'new' });
+});
+
+it('keeps a new model unconfirmed and usage unavailable until that task supplies its metadata', async () => {
+  vi.useFakeTimers();
+  let confirmed = false;
+  const settings = { model: 'model-b', reasoningEffort: 'low', catalogRevision: catalog.catalogRevision };
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.body) return new Response(JSON.stringify({ ...accepted, selectedSettings: settings }), { status: 202 });
+    if (url.includes('/models')) return new Response(JSON.stringify({
+      ...catalog,
+      data: [...catalog.data, {
+        id: 'model-b',
+        displayName: 'Second model',
+        defaultReasoningEffort: 'low',
+        supportedReasoningEfforts: [{ id: 'low', description: 'Low' }]
+      }]
+    }));
+    if (url.includes('/tasks/')) return new Response(JSON.stringify({
+      ...reserved,
+      state: 'running',
+      selectedSettings: settings,
+      effectiveSettings: confirmed ? {
+        model: 'model-b', reasoningEffort: 'low', confirmation: 'confirmed', reroutedModel: null
+      } : null,
+      usage: confirmed ? { ...reserved.usage, model: 'model-b', lastTotalTokens: 240 } : null
+    }));
+    return new Response(JSON.stringify(ready));
+  }));
+  render(<Harness />);
+  await flushBoundary();
+  expect(screen.getByText(/Active settings/).textContent).toContain('model-a / effort-medium (confirmed)');
+  expect(screen.getByText(/context estimate:/).textContent).toContain('120 / 1,000');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-b' } });
+  fireEvent.click(screen.getByRole('checkbox', { name: /acknowledge/i }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent change model' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await flushBoundary();
+  expect(screen.getByText(/Active settings/).textContent).toBe('Active settings: unconfirmed or unavailable');
+  expect(screen.getByText(/context estimate/).textContent).toBe('Last-request context estimate unavailable.');
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(screen.getByRole('status').textContent).toBe('Codex turn: running');
+  expect(screen.getByText(/Selected for next turn/).textContent).toBe('Selected for next turn: model-b / low');
+  expect(screen.getByText(/Active settings/).textContent).toBe('Active settings: unconfirmed or unavailable');
+  expect(screen.getByText(/context estimate/).textContent).toBe('Last-request context estimate unavailable.');
+  confirmed = true;
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(screen.getByText(/Active settings/).textContent).toBe('Active settings: model-b / low (confirmed)');
+  expect(screen.getByText(/context estimate/).textContent).toContain('240 / 1,000 tokens (24%; fresh; model-b;');
 });

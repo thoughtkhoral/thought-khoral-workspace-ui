@@ -11,9 +11,23 @@ export const CODEX_AGENT_ID = '74686f75-6768-746b-686f-72616c000004' as const;
 export function isDirectCodexMention(text: string, mentions: readonly ChatMention[]): boolean {
   if (!mentions.some(mention => mention.type === 'participant' && mention.id === CODEX_AGENT_ID && mention.token === 'codex-agent')) return false;
   let quote = '';
+  let codeDelimiter = 0;
+  let fence: { character: string; length: number } | null = null;
   let visible = '';
   for (const line of text.split('\n')) {
+    if (fence) {
+      const closing = /^ {0,3}(`+|~+)[ \t]*$/.exec(line)?.[1];
+      if (closing && closing[0] === fence.character && closing.length >= fence.length) fence = null;
+      visible += '\n';
+      continue;
+    }
     if (/^\s*>/.test(line)) {
+      visible += '\n';
+      continue;
+    }
+    const opening = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!quote && !codeDelimiter && opening && (opening[1]![0] === '~' || !opening[2]!.includes('`'))) {
+      fence = { character: opening[1]![0]!, length: opening[1]!.length };
       visible += '\n';
       continue;
     }
@@ -23,7 +37,17 @@ export function isDirectCodexMention(text: string, mentions: readonly ChatMentio
         if (char === quote && line[at - 1] !== '\\') quote = '';
         visible += ' ';
       }
-      else if (char === '`' || ((char === '"' || char === "'") && (at === 0 || /[\s([{=:]/.test(line[at - 1]!)))) {
+      else if (char === '`') {
+        let end = at + 1;
+        while (line[end] === '`') end++;
+        const length = end - at;
+        if (codeDelimiter === length) codeDelimiter = 0;
+        else if (!codeDelimiter) codeDelimiter = length;
+        visible += ' '.repeat(length);
+        at = end - 1;
+      }
+      else if (codeDelimiter) visible += ' ';
+      else if ((char === '"' || char === "'") && (at === 0 || /[\s([{=:]/.test(line[at - 1]!))) {
         quote = char;
         visible += ' ';
       }
@@ -154,6 +178,18 @@ export interface ProfileFailure {
   code: FailureCode;
   message: string;
 }
+interface TaskUpdateBase {
+  updateId: string;
+  ordinal: number;
+  occurredAt: string;
+}
+export type TaskUpdate = TaskUpdateBase & (
+  { kind: 'progress'; data: { phase: string; text: string; percent?: number } } |
+  { kind: 'settings'; data: EffectiveSettings } |
+  { kind: 'usage'; data: Usage } |
+  { kind: 'completed'; data: ProfileReply } |
+  { kind: 'failed'; data: Pick<ProfileFailure, 'code'> }
+);
 export interface TaskView {
   profileVersion: typeof PROFILE_VERSION;
   roomId: string;
@@ -165,17 +201,7 @@ export interface TaskView {
   selectedSettings: SelectedSettings | null;
   effectiveSettings: EffectiveSettings | null;
   usage: Usage | null;
-  updates: {
-    updateId: string;
-    ordinal: number;
-    kind: 'progress' | 'settings' | 'usage' | 'completed' | 'failed';
-    occurredAt: string;
-    data: {
-      phase: string;
-      text: string;
-      percent?: number;
-    } | EffectiveSettings | Usage | ProfileReply | ProfileFailure;
-  }[];
+  updates: TaskUpdate[];
   result: ProfileReply | null;
   replyEventId: string | null;
   failure: ProfileFailure | null;
@@ -259,8 +285,12 @@ function validate<T>(kind: keyof typeof validators, value: unknown): T {
       terminal[0]!.kind !== task.state || terminal[0] !== task.updates.at(-1)
     );
     if (terminal.length > 1 || terminalMismatch) throw new ConversationError('unexpected');
-    if ((task.state === 'completed' || task.state === 'failed') && (
-      !terminal.length || !equivalent(terminal[0]!.data, task.result ?? task.failure)
+    const last = terminal[0];
+    if (task.state === 'completed' && (
+      last?.kind !== 'completed' || !equivalent(last.data, task.result)
+    )) throw new ConversationError('unexpected');
+    if (task.state === 'failed' && (
+      last?.kind !== 'failed' || last.data.code !== task.failure?.code
     )) throw new ConversationError('unexpected');
   }
   return value as T;
@@ -271,6 +301,7 @@ function validateMetadata(value: {
 }): void {
   const effective = value.effectiveSettings;
   if (effective?.confirmation === 'confirmed' && (!effective.model || !effective.reasoningEffort)) throw new ConversationError('unexpected');
+  if (value.usage?.modelContextWindow === null && value.usage.freshness !== 'unavailable') throw new ConversationError('unexpected');
   if (value.usage?.freshness === 'fresh' && (!value.usage.modelContextWindow || !value.usage.model)) throw new ConversationError('unexpected');
 }
 function equivalent(left: unknown, right: unknown): boolean {
