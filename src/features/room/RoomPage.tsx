@@ -29,6 +29,9 @@ import type { DecisionEditTransition } from '../decisions/DecisionEditForm';
 import { MemoryDrawer } from '../decisions/MemoryDrawer';
 import { ParticipantDrawer } from '../participants/ParticipantDrawer';
 import { AgentTaskComposer } from './AgentTaskComposer';
+import { CODEX_AGENT_ID, createConversationApi, readConversationAdmission } from './conversationApi';
+import { CodexConversationControls } from './CodexConversationControls';
+import { useAgentConversation } from './useAgentConversation';
 import {
   useRoomSocket,
   type AuthenticatedSocketFactory,
@@ -46,6 +49,7 @@ export interface RoomPageProps {
   getAccessToken: () => Promise<string>;
   createSocket: AuthenticatedSocketFactory;
   socketUrl?: string;
+  conversationAdmission?: unknown;
   onEnterRoom?: (roomId: string) => void;
   onLeaveRoom?: () => void;
 }
@@ -56,6 +60,7 @@ export function RoomPage({
   getAccessToken,
   createSocket,
   socketUrl,
+  conversationAdmission,
   onEnterRoom,
   onLeaveRoom,
 }: RoomPageProps) {
@@ -88,6 +93,17 @@ export function RoomPage({
   const isConnected = status === 'connected';
   const canManageDecisions = participantRole === 'human';
   const canStartAgentTasks = participantRole === 'human';
+  const admission = readConversationAdmission(conversationAdmission);
+  const conversationApi = useMemo(() => createConversationApi(socketUrl), [socketUrl]);
+  const codex = useAgentConversation({
+    roomId: activeRoomId,
+    agentId: CODEX_AGENT_ID,
+    enabled: Boolean(admission && canStartAgentTasks && isConnected),
+    getAccessToken,
+    api: conversationApi,
+    loadModels: Boolean(admission?.modelSelection || admission?.reasoningEffort),
+  });
+  const canUseCodex = Boolean(admission && canStartAgentTasks);
 
   const rememberMutation = (
     requestId: string | false,
@@ -182,6 +198,7 @@ export function RoomPage({
       {activeRoomId ? (
         <ParticipantDrawer
           participants={roomParticipants}
+          conversationAdmission={admission ?? undefined}
           isExpanded={isParticipantsExpanded}
           onClose={() => setIsParticipantsExpanded(false)}
         >
@@ -244,8 +261,21 @@ export function RoomPage({
             )}
             <PageSection isFilled>
               <Stack hasGutter>
+                {canUseCodex && admission && (
+                  <StackItem>
+                    <CodexConversationControls
+                      conversation={codex}
+                      capabilities={{
+                        modelSelection: admission.modelSelection === true,
+                        reasoningEffort: admission.reasoningEffort === true,
+                        usage: admission.usageReporting === true,
+                      }}
+                    />
+                  </StackItem>
+                )}
                 <StackItem isFilled>
                   <ChatStream
+                    conversation={canUseCodex ? codex : undefined}
                     messages={room.messages}
                     tasks={room.tasks}
                     sourceEvents={events}
@@ -253,7 +283,7 @@ export function RoomPage({
                     isConnected={isConnected}
                     canManageDecisions={canManageDecisions}
                     onCommand={() => setIsDecisionDialogOpen(true)}
-                    onSendMessage={(values) => send('chat.send', values)}
+                    onSendMessage={(values) => send('chat.send', values) !== false}
                   />
                 </StackItem>
                 {canStartAgentTasks && (

@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { RoomPage } from './features/room/RoomPage';
 import type { ParticipantRole } from './features/decisions/DecisionCard';
 import type { AuthenticatedSocketFactory } from './features/room/useRoomSocket';
+import type { ConversationAdmission } from './features/room/conversationApi';
 
 import '@patternfly/chatbot/dist/css/main.css';
 
@@ -18,6 +19,7 @@ declare global {
       getAccessToken: () => Promise<string>;
       createSocket: AuthenticatedSocketFactory;
       socketUrl?: string;
+      conversationAdmission?: ConversationAdmission;
       onEnterRoom?: (roomId: string) => void;
       onLeaveRoom?: () => void;
     };

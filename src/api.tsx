@@ -502,6 +502,7 @@ function readChatMetadata(
 }
 
 function fallbackDisplayName(actor: RoomActor): string {
+  if (actor.role === 'agent' && actor.id === '74686f75-6768-746b-686f-72616c000004') return 'Codex Agent';
   return `${actor.role === 'human' ? 'Human' : 'Agent'} ${actor.id.slice(0, 8)}`;
 }
 
@@ -579,7 +580,7 @@ export function projectRoomEvents(events: readonly RoomEvent[]): RoomProjection 
         );
         messages.push({
           eventId: event.eventId,
-          actor: event.actor,
+          actor: event.actor.role === 'agent' && event.actor.id === '74686f75-6768-746b-686f-72616c000004' && !event.actor.displayName ? { ...event.actor, displayName: 'Codex Agent' } : event.actor,
           occurredAt: event.occurredAt,
           text,
           ...metadata,

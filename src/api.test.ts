@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import codexMessage from '../contracts/agent-conversation-v1/fixtures/valid/ordinary-codex-message.json';
 
 import {
   CONTRACT_VERSION,
@@ -24,6 +25,14 @@ const messageEvent: RoomEvent = {
   },
   payload: { text: 'Hello' },
 };
+
+it('attributes the valid ordinary Codex reply without interpreting it as a deterministic task', () => {
+  expect(isRoomEvent(codexMessage)).toBe(true);
+  const room = projectRoomEvents([codexMessage as RoomEvent]);
+  expect(room.tasks).toHaveLength(0);
+  expect(room.messages).toHaveLength(1);
+  expect(room.participants[0]?.displayName).toBe('Codex Agent');
+});
 
 describe('room participant projection', () => {
   it('keeps actor names and derives an offline participant from room history', () => {

@@ -16,15 +16,17 @@ import {
 import { useEffect, type ReactNode } from 'react';
 
 import type { RoomParticipant } from '../../api';
+import { CODEX_AGENT_ID, type ConversationAdmission } from '../room/conversationApi';
 
 export interface ParticipantDrawerProps {
   participants: readonly RoomParticipant[];
   isExpanded: boolean;
   onClose: () => void;
   children: ReactNode;
+  conversationAdmission?: ConversationAdmission;
 }
 
-function ParticipantRow({ participant }: { participant: RoomParticipant }) {
+function ParticipantRow({ participant, admission }: { participant: RoomParticipant; admission?: ConversationAdmission }) {
   return (
     <StackItem>
       <Content component="p">
@@ -47,6 +49,14 @@ function ParticipantRow({ participant }: { participant: RoomParticipant }) {
           {participant.online ? 'Online' : 'Offline'}
         </Label>
       </Content>
+      {admission && participant.id === CODEX_AGENT_ID && participant.role === 'agent' && (
+        <Content component="small">
+          Shared room thread · direct human addressing · room history
+          {admission.modelSelection ? ' · model selection' : ''}
+          {admission.reasoningEffort ? ' · reasoning effort' : ''}
+          {admission.usageReporting ? ' · context estimate' : ''}
+        </Content>
+      )}
     </StackItem>
   );
 }
@@ -56,6 +66,7 @@ export function ParticipantDrawer({
   isExpanded,
   onClose,
   children,
+  conversationAdmission,
 }: ParticipantDrawerProps) {
   useEffect(() => {
     if (!isExpanded) {
@@ -96,7 +107,7 @@ export function ParticipantDrawer({
         ) : (
           <Stack hasGutter>
             {participants.map((participant) => (
-              <ParticipantRow key={participant.id} participant={participant} />
+              <ParticipantRow key={participant.id} participant={participant} admission={conversationAdmission} />
             ))}
           </Stack>
         )}

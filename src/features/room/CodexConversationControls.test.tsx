@@ -1,0 +1,183 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { CodexConversationControls } from './CodexConversationControls';
+import { MentionComposer } from './MentionComposer';
+import { useAgentConversation } from './useAgentConversation';
+import { CODEX_AGENT_ID, createConversationApi } from './conversationApi';
+import ready from './__fixtures__/ready-view.json';
+import catalog from './__fixtures__/catalog.json';
+import accepted from './__fixtures__/accepted-turn.json';
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+const participants = [{
+  id: '00000004-1111-4111-8111-000000000004',
+  role: 'human' as const,
+  displayName: 'Maya',
+  online: true
+}, { id: CODEX_AGENT_ID, role: 'agent' as const, displayName: 'Codex Agent', online: true }];
+function Harness({ onChat = vi.fn(), capabilities, roster = participants }: {
+  onChat?: (values: import('../../api').ChatSendValues) => void;
+  roster?: typeof participants;
+  capabilities?: {
+    modelSelection: boolean;
+    reasoningEffort: boolean;
+    usage: boolean;
+  };
+}) {
+  const conversation = useAgentConversation({
+    roomId: ready.roomId,
+    agentId: CODEX_AGENT_ID,
+    enabled: true,
+    getAccessToken: async () => 'synthetic-token',
+    api: api
+  });
+  return <><CodexConversationControls conversation={conversation} capabilities={capabilities} /><MentionComposer
+    participants={roster}
+    isConnected
+    onSend={onChat}
+    conversation={conversation} /></>;
+}
+const api = createConversationApi();
+function boundary(options: {
+  busy?: boolean;
+  extraModel?: boolean;
+  view?: unknown;
+} = {}) {
+  const requests: {
+    url: string;
+    body?: Record<string, unknown>;
+  }[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.endsWith('/turns')) return new Response(JSON.stringify(options.busy ? {
+      profileVersion: ready.profileVersion,
+      code: 'conversation_busy',
+      message: 'secret',
+      requestId: null
+        } : { ...accepted, roomId: ready.roomId, selectedSettings: requests.at(-1)?.body?.settings ?? accepted.selectedSettings }), { status: options.busy ? 409 : 202 });
+    if (url.includes('/models')) return new Response(JSON.stringify(options.extraModel ? {
+      ...catalog, data: [...catalog.data, {
+        id: 'model-b',
+        displayName: 'Second model',
+        defaultReasoningEffort: 'low',
+        supportedReasoningEfforts: [{ id: 'low', description: 'Low' }]
+      }]
+    } : catalog));
+    return new Response(JSON.stringify(options.view ?? ready));
+  }));
+  return requests;
+}
+it('directly addressing Codex sends one profile request and no ordinary chat request', async () => {
+  const requests = boundary();
+  const chat = vi.fn();
+  render(<Harness onChat={chat} />);
+  await screen.findByRole('button', { name: 'New session' });
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toBeTruthy());
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent hello' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
+  expect(requests.find(r => r.body)!.body!.conversation).toEqual({ mode: 'continue', id: ready.conversation.id, generation: 1 });
+  expect(chat).not.toHaveBeenCalled();
+});
+it('keeps the admitted canonical Codex token when another participant has the same display name', async () => {
+  const requests = boundary();
+  render(<Harness roster={[{ ...participants[0]!, displayName: 'Codex Agent' }, participants[1]!]} />);
+  await screen.findByRole('combobox', { name: 'Model' });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent hello' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(request => request.body)).toHaveLength(1));
+  expect(requests.find(request => request.body)!.body!.mentions).toEqual([{ type: 'participant', id: CODEX_AGENT_ID, token: 'codex-agent' }]);
+});
+it('selected target adds a canonical typed mention; aliases and quoted mentions stay chat', async () => {
+  const requests = boundary();
+  const chat = vi.fn();
+  render(<Harness onChat={chat} />);
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toBeTruthy());
+  for (const text of ['@allagents hello', '> @codex-agent quoted', '`@codex-agent` code', '"@codex-agent" quote']) {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: text } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe(''));
+  }
+  expect(chat).toHaveBeenCalledTimes(4);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Conversation target' }), { target: { value: CODEX_AGENT_ID } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: 'hello' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
+  expect(requests.find(r => r.body)!.body!.text).toBe('@codex-agent hello');
+});
+it('rejects targeted Codex delivery and preserves drafts on busy rejection', async () => {
+  const requests = boundary({ busy: true });
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toBeTruthy());
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent keep this' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message delivery' }), { target: { value: 'mentioned' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(requests.filter(r => r.body)).toHaveLength(0);
+  expect(screen.getByRole('alert').textContent).toContain('room');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message delivery' }), { target: { value: 'room' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await screen.findByText(/busy/);
+  expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe('@codex-agent keep this');
+});
+it('discloses shared reset and requires acknowledging a model effort default; unsent choices remain local', async () => {
+  const requests = boundary({ extraModel: true });
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toBeTruthy());
+  expect(screen.getByText(/120.*1,000/)).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-b' } });
+  expect(requests.filter(r => r.body)).toHaveLength(0);
+  expect(screen.getByText(/Active.*model-a/)).toBeTruthy();
+  expect(screen.getByRole('checkbox', { name: /acknowledge/i })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'New session' }));
+  expect(screen.getByRole('checkbox', { name: /shared thread/i })).toBeTruthy();
+  expect(screen.getByText(/room history.*retain/i)).toBeTruthy();
+});
+it('hides unavailable optional controls', async () => {
+  boundary();
+  render(<Harness capabilities={{ modelSelection: false, reasoningEffort: false, usage: false }} />);
+  await screen.findByRole('button', { name: 'New session' });
+  expect(screen.queryByRole('combobox', { name: 'Model' })).toBeNull();
+  expect(screen.queryByRole('combobox', { name: 'Reasoning effort' })).toBeNull();
+});
+it('acknowledges shared reset then requests a fresh thread and disables controls while busy', async () => {
+  const requests = boundary();
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toBeTruthy());
+  fireEvent.click(screen.getByRole('button', { name: 'New session' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent fresh' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(requests.filter(r => r.body)).toHaveLength(0);
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
+  expect(requests.find(r => r.body)!.body!.conversation).toEqual({ mode: 'new' });
+  expect((screen.getByRole('button', { name: 'New session' }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('combobox', { name: 'Model' }) as HTMLSelectElement).disabled).toBe(true);
+});
+it('requires the effort acknowledgement before sending the local model choice', async () => {
+  const requests = boundary({ extraModel: true });
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toBeTruthy());
+  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-b' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent selected' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(requests.filter(r => r.body)).toHaveLength(0);
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('checkbox', { name: /acknowledge/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
+  expect(requests.find(r => r.body)!.body!.settings).toEqual({ model: 'model-b', reasoningEffort: 'low', catalogRevision: 'catalog-1' });
+  await screen.findByText(/Selected for next turn: model-b \/ low$/);
+  expect(screen.getByText(/Active settings/).textContent).toContain('unconfirmed');
+});
+it('shows zero usage, stale usage and unavailable metadata with their freshness', async () => {
+  for (const [usage, expected] of [[{ ...ready.conversation.usage, lastTotalTokens: 0 }, /0.*1,000.*fresh/], [{ ...ready.conversation.usage, freshness: 'stale' }, /120.*stale/], [null, /estimate unavailable/]] as const) {
+    boundary({ view: { ...ready, conversation: { ...ready.conversation, usage } } });
+    render(<Harness />);
+    await screen.findByText(expected);
+    cleanup();
+  }
+});

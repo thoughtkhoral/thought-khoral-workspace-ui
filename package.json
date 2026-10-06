@@ -8,14 +8,20 @@
   },
   "scripts": {
     "dev": "vite",
+    "check:contracts": "node scripts/check-conversation-contract.mjs",
+    "test:contracts": "node scripts/verify-conversation-contract-checker.mjs",
+    "prebuild": "npm run check:contracts",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "pretest": "npm run check:contracts && npm run test:contracts",
     "test:preview": "node static-preview-smoke.mjs && vitest run src/features/room/ChatStream.test.tsx"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",
     "@patternfly/chatbot": "6.7.1",
     "@patternfly/react-core": "6.6.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "monaco-editor": "0.54.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
@@ -33,6 +39,7 @@
     "vitest": "4.1.11"
   },
   "overrides": {
-    "dompurify": "3.4.13"
+    "dompurify": "3.4.16",
+    "source-map-js": "1.2.2"
   }
 }

@@ -66,6 +66,36 @@ host the agent's input flow. The UI does not invoke A2A directly or admit
 arbitrary remote agents. The earlier `@action-items` mention path remains a
 separate in-process deterministic task.
 
+## Codex shared room conversations
+
+This UI unit implements [issue 1](https://github.com/thoughtkhoral/thought-khoral-workspace-ui/issues/1)
+under the [local Codex requirements](.ai/specs/what/codex-room-participation.md)
+and [implementation design](.ai/specs/how/codex-room-participation.md).
+The OIDC-enabled host must explicitly declare the reviewed conversation
+admission in its bootstrap. Controls remain hidden when that declaration is
+absent or invalid. The broker still determines current permission and availability.
+
+When available to a human participant, choose **Codex Agent** as the conversation
+target or directly address `@codex-agent`. This sends one conversation request
+and posts the accepted human message through the broker. Aliases, quotations,
+and code mentions remain ordinary room chat. Codex conversation delivery is
+room-wide. A rejected request retains the unsent draft.
+
+**Continue session** uses the room's current shared thread, including turns by
+other humans. **New session** prepares a fresh thread for the next submitted
+message and requires acknowledgement that it resets the thread for everyone;
+room history remains. Model and effort choices are local until submission.
+If a new model requires an effort default, acknowledge it or explicitly choose
+a supported effort. The controls distinguish selected settings from confirmed
+runtime settings and label context estimates by their last request and freshness.
+Task results provide status; assistant text appears through the persisted room
+transcript once. Leaving clears the local conversation state and stops polling.
+
+The exact published profile is vendored under `contracts/agent-conversation-v1`.
+`npm run check:contracts` verifies its immutable lock and all 135 file hashes;
+`npm run test:contracts` exercises fixture, extra-file, and lock tampering in a
+temporary copy. The normal test and build commands run the pin gate automatically.
+
 ## Contributing
 
 Start with an issue in this repository. UI changes must reference the accepted

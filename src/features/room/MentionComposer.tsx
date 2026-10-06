@@ -2,6 +2,8 @@ import { Alert, Button, FormGroup, TextArea } from '@patternfly/react-core';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 
 import type { ChatMention, ChatSendValues, RoomParticipant } from '../../api';
+import { CODEX_AGENT_ID, isDirectCodexMention } from './conversationApi';
+import type { AgentConversation } from './useAgentConversation';
 import {
   activeMentionQuery,
   insertMention,
@@ -14,7 +16,8 @@ import {
 export interface MentionComposerProps {
   participants: readonly RoomParticipant[];
   isConnected: boolean;
-  onSend: (values: ChatSendValues) => void;
+  onSend: (values: ChatSendValues) => void | boolean | Promise<void | boolean>;
+  conversation?: AgentConversation;
 }
 
 const maxResolvedTargets = 50;
@@ -38,13 +41,21 @@ function selectedMentions(value: string, options: readonly MentionOption[]): Cha
   return mentions;
 }
 
-export function MentionComposer({ participants, isConnected, onSend }: MentionComposerProps) {
-  const options = useMemo(() => mentionOptions(participants), [participants]);
+export function MentionComposer({ participants, isConnected, onSend, conversation }: MentionComposerProps) {
+  const options = useMemo(() => mentionOptions(participants).map(option =>
+    conversation && option.type === 'participant' &&
+    option.participant.id === CODEX_AGENT_ID && option.participant.role === 'agent'
+      ? { ...option, token: 'codex-agent' }
+      : option,
+  ), [participants, Boolean(conversation)]);
   const [text, setText] = useState('');
   const [cursor, setCursor] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [delivery, setDelivery] = useState<'room' | 'mentioned'>('room');
+  const [target, setTarget] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const query = activeMentionQuery(text, cursor);
   const suggestions = isMenuOpen && query
     ? options.filter((option) => option.token.startsWith(query.query.toLowerCase()))
@@ -52,7 +63,7 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
   const unresolved = unresolvedMentionTokens(text, options);
   const mentions = selectedMentions(text, options);
   const exceedsTargetLimit = mentions.length > maxResolvedTargets;
-  const cannotSend = !text.trim() || !isConnected || unresolved.length > 0 ||
+  const cannotSend = !text.trim() || !isConnected || isSending || unresolved.length > 0 ||
     exceedsTargetLimit || (delivery === 'mentioned' && mentions.length === 0);
 
   const choose = (option: MentionOption) => {
@@ -63,11 +74,38 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
     setIsMenuOpen(false);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (cannotSend) return;
-    onSend({ text: text.trim(), mentions, delivery });
-    setText('');
-    setCursor(0);
+    setSendError(null);
+    let values: ChatSendValues = { text: text.trim(), mentions, delivery };
+    const option = options.find(option => option.type === 'participant' && option.participant.id === target);
+    if (conversation && target && option?.type === 'participant' && !isDirectCodexMention(values.text, values.mentions)) {
+      values = {
+        ...values,
+        text: `@${option.token} ${values.text}`,
+        mentions: [
+          { type: 'participant', id: option.participant.id, token: option.token },
+          ...mentions.filter(mention => mention.type !== 'participant' || mention.id !== option.participant.id),
+        ],
+      };
+    }
+    const addressed = isDirectCodexMention(values.text, values.mentions);
+    if (addressed && conversation && delivery !== 'room') {
+      setSendError('Codex conversations are available to everyone in the room. Choose room delivery.');
+      return;
+    }
+    setIsSending(true);
+    try {
+      const accepted = addressed && conversation ? await conversation.submit(values) : await onSend(values);
+      if (accepted !== false) {
+        setText('');
+        setCursor(0);
+      }
+    } catch {
+      setSendError('The message could not be sent. Your draft is retained.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -102,6 +140,27 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
 
   return (
     <div className="thought-khoral-mention-composer">
+      {conversation && (
+        <FormGroup label="Conversation target" fieldId="conversation-target">
+          <select
+            id="conversation-target"
+            aria-label="Conversation target"
+            value={target}
+            disabled={!isConnected || isSending}
+            onChange={event => setTarget(event.target.value)}
+          >
+            <option value="">Room chat</option>
+            {participants
+              .filter(participant => participant.id === CODEX_AGENT_ID && participant.role === 'agent')
+              .map(participant => (
+                <option key={participant.id} value={participant.id}>{participant.displayName}</option>
+              ))}
+          </select>
+        </FormGroup>
+      )}
+      {sendError && (
+        <Alert variant="danger" isInline title="Message retained" role="alert">{sendError}</Alert>
+      )}
       <FormGroup label="Message delivery" fieldId="message-delivery">
         <select
           id="message-delivery"
@@ -134,7 +193,7 @@ export function MentionComposer({ participants, isConnected, onSend }: MentionCo
             ? mentionOptionId(suggestions[activeIndex] ?? suggestions[0]!)
             : undefined}
           value={text}
-          isDisabled={!isConnected}
+          isDisabled={!isConnected || isSending}
           resizeOrientation="vertical"
           rows={3}
           onChange={(event) => {
