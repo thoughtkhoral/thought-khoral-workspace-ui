@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
 import { CONTRACT_VERSION } from '../../api';
 import { CODEX_AGENT_ID, PROFILE_VERSION } from './conversationApi';
@@ -10,6 +10,11 @@ import catalog from './__fixtures__/catalog.json';
 import accepted from './__fixtures__/accepted-turn.json';
 import completed from './__fixtures__/completed-task.json';
 import message from '../../../contracts/agent-conversation-v1/fixtures/valid/ordinary-codex-message.json';
+// Exercise the real chat component without making admission checks depend on
+// how quickly its lazy module loads under parallel test workers.
+beforeAll(async () => {
+  await import('./ChatStream');
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -41,22 +46,24 @@ class Socket extends EventTarget implements RoomWebSocket {
     this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) }));
   }
 }
-const getAccessToken = async () => 'synthetic-token';
+const getAccessToken = async () => {
+  await new Promise(resolve => setTimeout(resolve, 0));
+  return 'synthetic-token';
+};
 async function enter(declaration?: unknown, role: 'human' | 'agent' = 'human') {
   const socket = new Socket();
+  const createSocket = vi.fn(() => socket);
   render(<Suspense fallback={null}>
     <RoomPage
       roomId={ready.roomId}
       participantRole={role}
       getAccessToken={getAccessToken}
-      createSocket={() => socket}
+      createSocket={createSocket}
       conversationAdmission={declaration} />
   </Suspense>);
   fireEvent.click(screen.getByRole('button', { name: 'Enter room' }));
-  await act(async () => {
-    await Promise.resolve();
-    socket.open();
-  });
+  await waitFor(() => expect(createSocket).toHaveBeenCalledOnce());
+  act(() => socket.open());
   act(() => socket.receive({
     jsonrpc: '2.0',
     method: 'room.participants.updated',
