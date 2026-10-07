@@ -8,6 +8,8 @@ Dismiss controls for draft decisions.
 
 MVP / active development.
 
+For the cross-project Codex conversation status and remaining gates, see the [shared status guide](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/codex-conversation-status.md).
+
 ## Prerequisites and verification
 
 Use Node.js `^20.19.0` or `>=22.12.0` and npm:
