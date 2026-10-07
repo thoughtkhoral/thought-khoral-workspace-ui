@@ -8,6 +8,7 @@ import ready from './__fixtures__/ready-view.json';
 import catalog from './__fixtures__/catalog.json';
 import accepted from './__fixtures__/accepted-turn.json';
 import reserved from './__fixtures__/reserved-task.json';
+import defaults from './__fixtures__/resolved-settings.json';
 import failed from '../../../contracts/agent-conversation-v1/fixtures/valid/failed-task.json';
 afterEach(() => {
   cleanup();
@@ -35,7 +36,8 @@ function Harness({ onChat = vi.fn(), capabilities, roster = participants }: {
     enabled: true,
     getAccessToken: async () => 'synthetic-token',
     api: api,
-    loadModels: capabilities ? capabilities.modelSelection || capabilities.reasoningEffort : true
+    modelSelection: capabilities?.modelSelection ?? true,
+    reasoningEffort: capabilities?.reasoningEffort ?? true
   });
   return <><CodexConversationControls conversation={conversation} capabilities={capabilities} /><MentionComposer
     participants={roster}
@@ -61,6 +63,7 @@ function boundary(options: {
       message: 'secret',
       requestId: null
         } : { ...accepted, roomId: ready.roomId, selectedSettings: requests.at(-1)?.body?.settings ?? accepted.selectedSettings }), { status: options.busy ? 409 : 202 });
+    if (url.endsWith('/defaults')) return new Response(JSON.stringify({ ...defaults, selectedSettings: catalog.data[0] ? { model: 'model-a', reasoningEffort: 'effort-medium', catalogRevision: catalog.catalogRevision } : defaults.selectedSettings }));
     if (url.includes('/models')) return new Response(JSON.stringify(options.extraModel ? {
       ...catalog, data: [...catalog.data, {
         id: 'model-b',
@@ -182,8 +185,7 @@ it('acknowledges shared reset then requests a fresh thread and disables controls
   expect(requests.filter(r => r.body)).toHaveLength(0);
   await waitFor(() => expect((screen.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
-  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-a' } });
-  fireEvent.click(screen.getByRole('checkbox', { name: /supported effort default/i }));
+  await screen.findByText(/Selected for next turn: model-a \/ effort-medium/);
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
   expect(requests.find(r => r.body)!.body!.conversation).toEqual({ mode: 'new' });
@@ -232,6 +234,7 @@ it.each([
       requests.push(JSON.parse(String(init.body)));
       return new Response(JSON.stringify({ ...accepted, generation: 2 }), { status: 202 });
     }
+    if (url.endsWith('/defaults')) return new Response(JSON.stringify({ ...defaults, selectedSettings: ready.conversation.selectedSettings }));
     if (url.includes('/models')) return new Response(JSON.stringify(catalog));
     if (url.includes('/tasks/')) {
       terminal = true;
@@ -260,8 +263,7 @@ it.each([
   expect(screen.queryByRole('button', { name: 'Continue session' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'New session' }));
   fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
-  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-a' } });
-  fireEvent.click(screen.getByRole('checkbox', { name: /supported effort default/i }));
+  await flushBoundary();
   fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent recover' } });
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   await flushBoundary();
@@ -318,34 +320,22 @@ it('keeps a new model unconfirmed and usage unavailable until that task supplies
 });
 
 
-it.each([
-  ['initial', false], ['initial', true], ['reset', false], ['reset', true]
-] as const)('requires a deliberate visible pair for %s (multiple options=%s)', async (mode, multiple) => {
-  const requests = boundary({ extraModel: multiple, view: mode === 'initial' ? { ...ready, conversation: null } : ready });
+it.each(['initial', 'reset'] as const)('displays resolved fresh settings for %s and retains explicit reset acknowledgement', async mode => {
+  const requests = boundary({ view: mode === 'initial' ? { ...ready, conversation: null } : ready });
   render(<Harness />);
-  await screen.findByRole('combobox', { name: 'Model' });
+  await screen.findByText(/Selected for next turn: model-a \/ effort-medium/);
   if (mode === 'reset') {
     fireEvent.click(screen.getByRole('button', { name: 'New session' }));
+    await screen.findByText(/Selected for next turn: model-a \/ effort-medium/);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent resolved pair' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' })); await flushBoundary();
+    expect(requests.filter(request => request.body)).toHaveLength(0);
     fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
-    expect(screen.getByText(/Active settings/).textContent).toContain('model-a / effort-medium');
   }
-  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent deliberate pair' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-  await flushBoundary();
-  expect(requests.filter(request => request.body)).toHaveLength(0);
-  expect((screen.getByRole('combobox', { name: 'Model' }) as HTMLSelectElement).value).toBe('');
-  const model = multiple ? 'model-b' : 'model-a';
-  const effort = multiple ? 'low' : 'effort-medium';
-  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: model } });
-  expect((screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement).value).toBe(effort);
-  expect(screen.getByText(/Selected for next turn/).textContent).toContain(`${model} / ${effort}`);
-  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-  await flushBoundary();
-  expect(requests.filter(request => request.body)).toHaveLength(0);
-  fireEvent.click(screen.getByRole('checkbox', { name: /supported effort default/i }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent resolved pair' } });
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   await waitFor(() => expect(requests.filter(request => request.body)).toHaveLength(1));
-  expect(requests.find(request => request.body)!.body!.settings).toEqual({ model, reasoningEffort: effort, catalogRevision: 'catalog-1' });
+  expect(requests.find(request => request.body)!.body!.settings).toEqual(ready.conversation.selectedSettings);
   expect(requests.find(request => request.body)!.body!.conversation).toEqual({ mode: 'new' });
 });
 
@@ -358,4 +348,20 @@ it('permits initial invocation for a capability without settings controls', asyn
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   await waitFor(() => expect(requests.filter(request => request.body)).toHaveLength(1));
   expect(requests.find(request => request.body)!.body!.settings).toBeUndefined();
+});
+
+it('retains the prompt on stale catalog rejection and requires explicit Refresh settings', async () => {
+  const requests = boundary();
+  const http = fetch as ReturnType<typeof vi.fn<(url: string, init?: RequestInit) => Promise<Response>>>;
+  const original = http.getMockImplementation()!;
+  http.mockImplementation(async (url: string, init?: RequestInit) => url.endsWith('/turns') ? new Response(JSON.stringify({ profileVersion: ready.profileVersion, code: 'conversation_stale', requestId: null, message: 'private' }), { status: 409 }) : original(url, init));
+  render(<Harness />); await screen.findByText(/Selected for next turn: model-a/);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent retained' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await screen.findByRole('button', { name: 'Refresh settings' });
+  expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe('@codex-agent retained');
+  expect(screen.getByText(/Selected for next turn/).textContent).not.toContain('model-a');
+  const priorReads = requests.length;
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh settings' })); await screen.findByText(/Selected for next turn: model-a/);
+  expect(requests.length).toBeGreaterThan(priorReads); expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe('@codex-agent retained');
 });

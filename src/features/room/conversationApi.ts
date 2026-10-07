@@ -4,6 +4,7 @@ import turnSchema from '../../../contracts/agent-conversation-v1/schemas/turn.sc
 import viewSchema from '../../../contracts/agent-conversation-v1/schemas/view.schema.json';
 import catalogSchema from '../../../contracts/agent-conversation-v1/schemas/catalog.schema.json';
 import errorSchema from '../../../contracts/agent-conversation-v1/schemas/error.schema.json';
+import resolvedSettingsSchema from '../../../contracts/agent-conversation-v1.1-candidate/schemas/agent-conversation-v1/resolved-settings.schema.json';
 import type { ChatMention } from '../../api';
 import { mentionTokens } from './mentions';
 export const PROFILE_VERSION = 'thought-khoral.agent-conversation.v1' as const;
@@ -90,6 +91,12 @@ export interface SelectedSettings {
   model: string;
   reasoningEffort: string;
   catalogRevision: string;
+}
+export interface ResolvedSettingsView {
+  profileVersion: typeof PROFILE_VERSION;
+  roomId: string;
+  agentId: string;
+  selectedSettings: SelectedSettings;
 }
 export interface EffectiveSettings {
   model: string | null;
@@ -215,6 +222,7 @@ const messages: Record<string, string> = {
   context_too_large: 'The room context exceeds the supported limit.',
   runtime_unavailable: 'Codex is currently unavailable.',
   authentication_required: 'Sign in again to use Codex.',
+  settings_unavailable: 'Settings unavailable. Refresh settings to review the current model and reasoning effort.',
   session_unavailable: 'The shared session is unavailable. Start a new session.',
   timeout: 'The turn timed out. Review the session before starting a new turn.',
   conversation_interrupted: 'The turn was interrupted. Start a new session.',
@@ -231,8 +239,9 @@ export function safeConversationError(error: unknown): ConversationError {
 }
 const ajv = new Ajv2020({ strict: true, strictRequired: false });
 addFormats(ajv);
-for (const schema of [turnSchema, viewSchema, catalogSchema, errorSchema]) ajv.addSchema(schema);
+for (const schema of [turnSchema, viewSchema, catalogSchema, errorSchema, resolvedSettingsSchema]) ajv.addSchema(schema);
 const validators = {
+  defaults: ajv.getSchema(resolvedSettingsSchema.$id)!,
   turn: ajv.getSchema(turnSchema.$id)!,
   view: ajv.getSchema(viewSchema.$id)!,
   catalog: ajv.getSchema(catalogSchema.$id)!,
@@ -459,12 +468,18 @@ export function createConversationApi(socketUrl?: string) {
       if (accepted.roomId !== turn.roomId || (turn.conversation?.mode === 'continue' && (
         accepted.conversationId !== turn.conversation.id || accepted.generation !== turn.conversation.generation
       ))) throw new ConversationError('unexpected');
+      if (turn.settings && !equivalent(accepted.selectedSettings, turn.settings)) throw new ConversationError('unexpected');
       return accepted;
     },
     async getConversation(token: string, roomId: string, agentId: string): Promise<ConversationView> {
       const view = await request<ConversationView>(token, `/rooms/${segment(roomId)}/agents/${segment(agentId)}`, 'view');
       if (view.roomId !== roomId || view.agentId !== agentId) throw new ConversationError('unexpected');
       return view;
+    },
+    async getDefaults(token: string, roomId: string, agentId: string): Promise<ResolvedSettingsView> {
+      const defaults = await request<ResolvedSettingsView>(token, `/rooms/${segment(roomId)}/agents/${segment(agentId)}/defaults`, 'defaults');
+      if (defaults.roomId !== roomId || defaults.agentId !== agentId) throw new ConversationError('unexpected');
+      return defaults;
     },
     listModels(token: string, roomId: string, agentId: string, cursor?: string): Promise<CatalogPage> {
       if (cursor !== undefined && (cursor.length === 0 || cursor.length > 256)) throw new ConversationError('invalid_task_input');

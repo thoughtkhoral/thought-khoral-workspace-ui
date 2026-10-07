@@ -137,3 +137,43 @@ it('requires the profile HTTP success status for each response variant', async (
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respond(ready, 202)));
   await expect(api.getConversation('t', ready.roomId, ready.agentId)).rejects.toThrow('unexpected');
 });
+
+const defaults = { profileVersion: ready.profileVersion, roomId: ready.roomId, agentId: ready.agentId,
+  selectedSettings: { model: 'model-b', reasoningEffort: 'effort-high', catalogRevision: 'catalog-1' } };
+it('reads bounded authenticated defaults without credentials, redirects or caches', async () => {
+  const http = vi.fn().mockResolvedValue(respond(defaults)); vi.stubGlobal('fetch', http);
+  expect(await createConversationApi('wss://gateway.example.test/ws').getDefaults('synthetic-token', ready.roomId, ready.agentId)).toEqual(defaults);
+  expect(http.mock.calls[0]).toEqual([`https://gateway.example.test/api/agent-conversations/v1/rooms/${ready.roomId}/agents/${ready.agentId}/defaults`, expect.objectContaining({
+    method: 'GET', headers: { Authorization: 'Bearer synthetic-token', Accept: 'application/json' }, credentials: 'omit', redirect: 'error', cache: 'no-store', body: undefined
+  })]);
+});
+it.each([
+  { ...defaults, roomId: '00000001-1111-4111-8111-000000000001' },
+  { ...defaults, agentId: '00000001-1111-4111-8111-000000000001' },
+  { ...defaults, profileVersion: 'wrong' }, { ...defaults, selectedSettings: null },
+  { ...defaults, selectedSettings: { model: 'model-b' } }, { ...defaults, nativeThreadId: 'private' },
+  { ...defaults, selectedSettings: { ...defaults.selectedSettings, privateToken: 'private' } },
+  { ...defaults, effectiveSettings: null },
+  { ...defaults, selectedSettings: { ...defaults.selectedSettings, reasoningEffort: 'x'.repeat(129) } }
+])('rejects closed defaults schema/binding violation %#', async value => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respond(value)));
+  await expect(createConversationApi().getDefaults('t', ready.roomId, ready.agentId)).rejects.toThrow('unexpected');
+});
+it.each([
+  () => new Response(JSON.stringify(defaults).replace('{', '{"roomId":"duplicate",')),
+  () => new Response(new Uint8Array([0xff])),
+  () => new Response(' '.repeat(4 * 1024 * 1024 + 1))
+])('rejects defaults duplicate JSON, invalid UTF-8 and oversized payload %#', async response => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response()));
+  await expect(createConversationApi().getDefaults('t', ready.roomId, ready.agentId)).rejects.toThrow('unexpected');
+});
+it.each([[401, 'authentication_required', /Sign in/i], [503, 'session_unavailable', /unavailable/i]] as const)('maps defaults HTTP %s safely', async (status, code, text) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respond({ profileVersion: ready.profileVersion, requestId: null, code, message: 'private provider trace' }, status)));
+  await expect(createConversationApi().getDefaults('t', ready.roomId, ready.agentId)).rejects.toThrow(text);
+});
+
+it('rejects acceptance that changes an explicitly submitted pair', async () => {
+  const explicit = { ...turn, settings: defaults.selectedSettings };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respond({ ...accepted, roomId: turn.roomId }, 202)));
+  await expect(createConversationApi().sendTurn('t', explicit)).rejects.toThrow('unexpected');
+});

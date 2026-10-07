@@ -194,3 +194,80 @@ conversation exists. This guard satisfies concrete selection and prevents an
 unseen default from running, but automatic resolved-default display remains a
 pending design gap under the approved root How. No default is inferred from
 catalog order; no new endpoint or changed published artifact is implemented.
+
+## Approved defaults-discovery amendment — 2026-10-07
+
+The maintainer approved the [visible server defaults design](https://github.com/thoughtkhoral/thought-khoral-codex-agent/blob/main/.ai/specs/how/default-settings-discovery-proposal.md) in
+this conversation on 2026-10-07 after an explicit specification approval request.
+It authorizes coordinated local implementation and synthetic verification of
+the additive authenticated defaults query and independently optional model/effort
+controls, including the F1 initial/reset effort-only deadlock. The accepted
+design is the governing amendment to earlier default-visibility wording.
+
+The contracts owner defines `ResolvedSettingsView` at
+`GET /api/agent-conversations/v1/rooms/{roomId}/agents/{agentId}/defaults` in
+new immutable artifact `thought-khoral-agent-conversation-v1.1.0`, retaining the
+v1 profile/namespace and all existing published v1.0 schema/fixture bytes.
+The broker validates authenticated room/agent authority, current admission,
+catalog revision, policy-default pair and five-second bound before responding.
+The read has no task/event/conversation/lease/native-state mutation, exposes no
+effective-settings confirmation, credentials or private/native identifiers,
+uses the existing safe ProfileError/HTTP mapping and `Cache-Control: no-store`.
+There is no inferred catalog-order model or inference fallback.
+
+The UI resolves and displays the concrete explicit next-turn pair when absent
+or explicitly New/reset; restored continuation uses accepted shared settings.
+Both capabilities allow both controls; effort-only keeps the resolved model
+read-only; model-only keeps the displayed model-specific catalog default effort
+read-only; neither capability retains the settings-free path. Unsupported
+controls stay uneditable and no hidden control blocks a valid required choice.
+Catalog/pair mismatch requires bounded refresh or an explicit unavailable state.
+A still-valid explicit pair is not replaced after a deployment-default-only change.
+
+As a scoped exception to the earlier published-artifact-first execution order,
+isolated consumers may pin a reproducible local candidate from an exact committed
+contracts revision, verified archive and per-file SHA-256 values, clearly marked
+unreleased. This exception is only for this amendment's local pre-publication
+development and synthetic testing. Published v1.0 provenance/bytes remain intact.
+No release publication, shipped interoperability, merge, push, provider use or
+service activation is authorized. Whole milestone/Task9 acceptance remains open.
+
+### Task 3 local implementation checkpoint — 2026-10-07
+
+The browser consumes only the candidate's new `ResolvedSettingsView` schema,
+registering its reference to the existing published turn schema once. The released
+135-file vendor and published pin checker remain unchanged. The local candidate
+has 156 exact payload files, contracts commit
+`1ea828f28725ddaaefa21d083473f9abbd777975`, archive SHA-256
+`fab59a486f6498b843467202debcb0768403bd57ba7dda41be2a01e5f23fdda8`, and lock SHA-256
+`7914d32eae2487879a68405b5095a6b9aa91355f87529c43f4055844821902a9`.
+The defaults client shares the published bounded strict parser and authenticated,
+no-store, credential-free, redirect-rejecting HTTP wrapper. It checks request
+room/agent bindings and rejects mismatched explicit acceptance settings.
+
+Settings acquisition restores authenticated conversation state, traverses at most
+100 catalog pages, and obtains defaults only for absent or explicit New sessions.
+A concrete pair is validated against the complete catalog before enabling submit.
+Room epochs and settings-request sequences reject delayed discovery after New,
+Continue, later edits, Leave, room switching or authentication loss. Independent
+primitive capabilities govern both hook edits and controls. The sole selected
+pair supplies editable/read-only values and the explicit request. Submission
+captures that displayed pair before its server-generation refresh, never querying
+deployment defaults again. Neither capability keeps catalog/default reads and
+submitted settings absent. New retains shared-reset acknowledgement.
+
+Stale, removed or unresolved pairs become unavailable without guessing a model.
+Refresh settings is a single bounded human action; a persisted allowed model/effort
+can be reviewed against a changed revision without mutating stored state before
+acceptance. Rejections retain the draft and never replay automatically. Cached
+catalog edits and Continue cannot revive failed discovery without that review.
+
+Synthetic regression coverage includes all four capability combinations across
+initial, restored and New phases, F1 effort-only editing/submission, bounded catalog
+failures, absent/removed/revision mismatches, policy-only changes, prompt retention,
+immutable explicit acceptance and async discovery cancellation. The composed child
+is opt-in and uses real HTTP responses with actual RoomPage/ChatStream/controls,
+records the DOM pair before Send plus real acceptance in fresh temporary evidence,
+and then Leaves. A normal-suite skip is expected; Task 4 owns actual composed
+execution. Publication, provider calls, activation, image/native/tool-policy changes,
+merge and push remain outside this checkpoint.

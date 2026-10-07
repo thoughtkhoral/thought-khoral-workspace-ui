@@ -101,7 +101,8 @@ export function RoomPage({
     enabled: Boolean(admission && canStartAgentTasks && isConnected),
     getAccessToken,
     api: conversationApi,
-    loadModels: Boolean(admission?.modelSelection || admission?.reasoningEffort),
+    modelSelection: admission?.modelSelection === true,
+    reasoningEffort: admission?.reasoningEffort === true,
   });
   const canUseCodex = Boolean(admission && canStartAgentTasks);
 

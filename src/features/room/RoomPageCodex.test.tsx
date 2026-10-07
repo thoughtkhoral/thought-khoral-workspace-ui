@@ -9,6 +9,7 @@ import ready from './__fixtures__/ready-view.json';
 import catalog from './__fixtures__/catalog.json';
 import accepted from './__fixtures__/accepted-turn.json';
 import completed from './__fixtures__/completed-task.json';
+import defaults from './__fixtures__/resolved-settings.json';
 import message from '../../../contracts/agent-conversation-v1/fixtures/valid/ordinary-codex-message.json';
 // Exercise the real chat component without making admission checks depend on
 // how quickly its lazy module loads under parallel test workers.
@@ -118,4 +119,45 @@ it('uses the profile once, renders the persisted reply once, and clears conversa
   fireEvent.click(screen.getByRole('button', { name: 'Leave room' }));
   expect(screen.queryByRole('button', { name: 'New session' })).toBeNull();
   expect(screen.queryByText('Maya proposed blue; Leo corrected it to green.')).toBeNull();
+});
+
+const capabilityRows = [true, false].flatMap(modelSelection => [true, false].flatMap(reasoningEffort =>
+  ['initial', 'restored', 'new'].map(phase => ({ modelSelection, reasoningEffort, phase }))));
+const twoModels = { ...catalog, data: [...catalog.data, { id: 'model-b', displayName: 'Second model',
+  defaultReasoningEffort: 'effort-high', supportedReasoningEfforts: [{ id: 'effort-high', description: 'High' }, { id: 'effort-low', description: 'Low' }] }] };
+
+it.each(capabilityRows)('RoomPage exact settings model=$modelSelection effort=$reasoningEffort phase=$phase', async ({ modelSelection, reasoningEffort, phase }) => {
+  const reads: string[] = []; const bodies: Record<string, any>[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    reads.push(url);
+    if (init?.body) { const body = JSON.parse(String(init.body)); bodies.push(body); return new Response(JSON.stringify({ ...accepted, selectedSettings: body.settings ?? accepted.selectedSettings }), { status: 202 }); }
+    return new Response(JSON.stringify(url.endsWith('/defaults') ? defaults : url.includes('/models') ? twoModels : phase === 'initial' ? { ...ready, conversation: null } : ready));
+  }));
+  const socket = await enter({ ...admission, modelSelection, reasoningEffort });
+  const supports = modelSelection || reasoningEffort;
+  if (supports) await screen.findByText(/Selected for next turn: model-/);
+  else await screen.findByRole('button', { name: 'New session' });
+  if (phase === 'new') { fireEvent.click(screen.getByRole('button', { name: 'New session' })); fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i })); if (supports) await screen.findByText(/Selected for next turn: model-b \/ effort-high/); }
+  if (supports) {
+    const pair = phase === 'restored' ? ready.conversation.selectedSettings : defaults.selectedSettings;
+    expect(screen.getByText(/Selected for next turn/).textContent).toContain(`${pair.model} / ${pair.reasoningEffort}`);
+    expect(Boolean(screen.queryByRole('combobox', { name: 'Model' }))).toBe(modelSelection);
+    expect(Boolean(screen.queryByRole('combobox', { name: 'Reasoning effort' }))).toBe(reasoningEffort);
+    if (!modelSelection) expect(screen.getByLabelText('Model (read only)').textContent).toContain(pair.model);
+    if (!reasoningEffort) expect(screen.getByLabelText('Reasoning effort (read only)').textContent).toContain(pair.reasoningEffort);
+    // F1: the sole editable effort is enabled, supported edits work on initial/New.
+    if (!modelSelection && reasoningEffort && phase !== 'restored') {
+      const control = screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement;
+      expect(control.disabled).toBe(false); fireEvent.change(control, { target: { value: 'effort-low' } });
+    }
+  } else { expect(screen.queryByText(/Selected for next turn/)).toBeNull(); }
+  expect(reads.filter(url => url.endsWith('/defaults'))).toHaveLength(supports && phase !== 'restored' ? 1 : 0);
+  expect(reads.filter(url => url.includes('/models'))).toHaveLength(supports ? phase === 'new' ? 2 : 1 : 0);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent shown pair' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(bodies).toHaveLength(1));
+  const expected = supports ? phase === 'restored' ? ready.conversation.selectedSettings : { ...defaults.selectedSettings, ...(!modelSelection && reasoningEffort ? { reasoningEffort: 'effort-low' } : {}) } : undefined;
+  expect(bodies[0]!.settings).toEqual(expected);
+  expect(socket.sent.map(item => JSON.parse(item).method).filter(method => method === 'chat.send')).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button', { name: 'Leave room' }));
 });

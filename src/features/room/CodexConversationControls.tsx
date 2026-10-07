@@ -27,7 +27,7 @@ export function CodexConversationControls({
   capabilities = { modelSelection: true, reasoningEffort: true, usage: true },
 }: ControlsProps) {
   const state = conversation.view?.conversation;
-  const chosen = conversation.draftSettings ?? (conversation.newSession ? undefined : conversation.submittedSettings ?? state?.selectedSettings);
+  const chosen = conversation.selectedSettings;
   const model = conversation.catalog?.data.find(option => option.id === chosen?.model);
   const effective = conversation.pendingConfirmation
     ? null
@@ -36,7 +36,7 @@ export function CodexConversationControls({
     ? null
     : conversation.task ? conversation.task.usage : state?.usage;
   const unavailable = !conversation.isAvailable;
-  const disableControls = conversation.busy || unavailable;
+  const disableControls = conversation.busy || conversation.settingsLoading || unavailable;
   const contextEstimate = usage && usage.freshness !== 'unavailable' && usage.modelContextWindow
     ? `Last-request context estimate: ${usage.lastTotalTokens.toLocaleString()} / ${usage.modelContextWindow.toLocaleString()} tokens (${Math.round(100 * usage.lastTotalTokens / usage.modelContextWindow)}%; ${usage.freshness}; ${usage.model ?? 'model unavailable'}; reported ${usage.reportedAt})`
     : 'Last-request context estimate unavailable.';
@@ -85,8 +85,14 @@ export function CodexConversationControls({
         </StackItem>
       )}
       {conversation.needsSettingsSelection && !conversation.busy && (
-        <StackItem><Content component="p">Choose a model and reasoning effort before starting a new session.</Content></StackItem>
+        <StackItem><Content component="p">Settings unavailable. Refresh settings before sending.</Content></StackItem>
       )}
+      {conversation.needsSettingsSelection && !conversation.busy && <StackItem>
+        <Button variant="secondary" onClick={() => void conversation.refreshSettings()} isDisabled={conversation.settingsLoading}>Refresh settings</Button>
+      </StackItem>}
+      {conversation.settingsLoading && <StackItem><Content component="p">Loading settings…</Content></StackItem>}
+      {capabilities.reasoningEffort && !capabilities.modelSelection && <StackItem><Content component="p" aria-label="Model (read only)">Model: {chosen?.model ?? 'unavailable'}</Content></StackItem>}
+      {capabilities.modelSelection && !capabilities.reasoningEffort && <StackItem><Content component="p" aria-label="Reasoning effort (read only)">Reasoning effort: {chosen?.reasoningEffort ?? 'unavailable'}</Content></StackItem>}
       {capabilities.modelSelection && conversation.catalog && conversation.catalog.data.length > 0 && (
         <StackItem>
           <FormGroup label="Model" fieldId="codex-model">
@@ -135,7 +141,7 @@ export function CodexConversationControls({
       )}
       {(capabilities.modelSelection || capabilities.reasoningEffort) && (
         <StackItem>
-          <Content component="p">
+          <Content component="p" data-catalog-revision={chosen?.catalogRevision}>
             Selected for next turn: {chosen
               ? `${chosen.model} / ${chosen.reasoningEffort}${conversation.draftSettings ? ' (unsent)' : ''}`
               : 'choose a model and reasoning effort'}
