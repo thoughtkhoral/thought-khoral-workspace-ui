@@ -18,8 +18,26 @@ class SyntheticSocket extends EventTarget implements RoomWebSocket {
   receive(data: unknown) { this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) })); }
 }
 const environment = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
+// The hook exists only to pause the real filesystem publication boundary in tests.
+async function publishHandshake(path: string, data: string, afterOpen = async () => {}) {
+  const fsModule = 'node:fs/promises';
+  const fs = await import(fsModule) as {
+    open: (path: string, flag: string) => Promise<{ writeFile: (data: string) => Promise<void>; close: () => Promise<void> }>;
+    link: (existing: string, target: string) => Promise<void>; unlink: (path: string) => Promise<void>;
+  };
+  const staging = `${path}.staging-${crypto.randomUUID()}`;
+  const file = await fs.open(staging, 'wx');
+  let closed = false;
+  try {
+    await afterOpen(); await file.writeFile(data); await file.close(); closed = true;
+    // Same-directory hard-link publication is atomic and refuses an existing target.
+    await fs.link(staging, path);
+  } finally {
+    try { if (!closed) await file.close(); } finally { await fs.unlink(staging); }
+  }
+}
 // Test-only filesystem handshake: fresh files in the fixture-owned evidence directory.
-async function displayBarrier(env: Record<string, string | undefined>, display: unknown, timeout = 10000) {
+async function displayBarrier(env: Record<string, string | undefined>, display: unknown, timeout = 10000, afterDisplayOpen = async () => {}) {
   const displayFile = env.CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE;
   const releaseFile = env.CODEX_DEFAULTS_SEND_RELEASE_FILE;
   if (!displayFile && !releaseFile) return;
@@ -30,7 +48,7 @@ async function displayBarrier(env: Record<string, string | undefined>, display: 
   if (![displayFile, releaseFile].every(path => isAbsolute(path) && dirname(path) === dirname(env.CODEX_DEFAULTS_EVIDENCE_FILE ?? ''))) throw new Error('Barrier must share owned evidence directory');
   try { await fs.access(releaseFile); throw new Error('Send release already exists'); }
   catch (error) { if ((error as { code?: string }).code !== 'ENOENT') throw error; }
-  await fs.writeFile(displayFile, `${JSON.stringify(display)}\n`, { flag: 'wx' });
+  await publishHandshake(displayFile, `${JSON.stringify(display)}\n`, afterDisplayOpen);
   const end = Date.now() + timeout;
   while (Date.now() < end) {
     try {
@@ -215,4 +233,53 @@ it('refuses incomplete, stale and timed-out display/send handshakes', async () =
     await expect(fs.access(env.CODEX_DEFAULTS_EVIDENCE_FILE)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(displayBarrier(env, {}, 25)).rejects.toMatchObject({ code: 'EEXIST' });
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+it('publishes complete display evidence only after a paused writer finishes and rejects a completed invalid release', async () => {
+  const fsModule = 'node:fs/promises'; const osModule = 'node:os'; const pathModule = 'node:path';
+  const fs = await import(fsModule) as { mkdtemp: (prefix: string) => Promise<string>; access: (path: string) => Promise<void>; readFile: (path: string, encoding: string) => Promise<string>; readdir: (path: string) => Promise<string[]>; rm: (path: string, options: { recursive: boolean; force: boolean }) => Promise<void> };
+  const { tmpdir } = await import(osModule) as { tmpdir: () => string }; const { join } = await import(pathModule) as { join: (...parts: string[]) => string };
+  const dir = await fs.mkdtemp(join(tmpdir(), 'codex-display-atomic-'));
+  const env = { CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE: join(dir, 'display.json'), CODEX_DEFAULTS_SEND_RELEASE_FILE: join(dir, 'release.json'), CODEX_DEFAULTS_EVIDENCE_FILE: join(dir, 'result.json') };
+  let opened!: () => void; let resume!: () => void;
+  const atOpen = new Promise<void>(resolve => { opened = resolve; }); const resumed = new Promise<void>(resolve => { resume = resolve; });
+  const barrier = displayBarrier(env, { displayedSettings: 'synthetic complete display' }, 2000, async () => { opened(); await resumed; });
+  const rejected = expect(barrier).rejects.toThrow('Invalid send release');
+  try {
+    await atOpen;
+    // This observation is deliberately between exclusive open and the write.
+    const visibleBeforeWrite = await fs.access(env.CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE).then(() => true, () => false);
+    resume();
+    await waitFor(async () => expect(await fs.readFile(env.CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE, 'utf8')).toBe('{"displayedSettings":"synthetic complete display"}\n'));
+    await publishHandshake(env.CODEX_DEFAULTS_SEND_RELEASE_FILE, '{"release":false}\n');
+    await rejected;
+    expect(visibleBeforeWrite).toBe(false);
+    expect((await fs.readdir(dir)).sort()).toEqual(['display.json', 'release.json']);
+    await expect(fs.access(env.CODEX_DEFAULTS_EVIDENCE_FILE)).rejects.toMatchObject({ code: 'ENOENT' });
+  } finally { resume(); await barrier.catch(() => {}); await fs.rm(dir, { recursive: true, force: true }); }
+});
+
+it('waits across a paused release publisher and never replaces a completed handshake', async () => {
+  const fsModule = 'node:fs/promises'; const osModule = 'node:os'; const pathModule = 'node:path';
+  const fs = await import(fsModule) as { mkdtemp: (prefix: string) => Promise<string>; access: (path: string) => Promise<void>; readFile: (path: string, encoding: string) => Promise<string>; readdir: (path: string) => Promise<string[]>; rm: (path: string, options: { recursive: boolean; force: boolean }) => Promise<void> };
+  const { tmpdir } = await import(osModule) as { tmpdir: () => string }; const { join } = await import(pathModule) as { join: (...parts: string[]) => string };
+  const dir = await fs.mkdtemp(join(tmpdir(), 'codex-release-atomic-'));
+  const env = { CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE: join(dir, 'display.json'), CODEX_DEFAULTS_SEND_RELEASE_FILE: join(dir, 'release.json'), CODEX_DEFAULTS_EVIDENCE_FILE: join(dir, 'result.json') };
+  let opened!: () => void; let resume!: () => void;
+  const atOpen = new Promise<void>(resolve => { opened = resolve; }); const resumed = new Promise<void>(resolve => { resume = resolve; });
+  let outcome = 'pending';
+  const barrier = displayBarrier(env, {}, 2000).then(() => { outcome = 'resolved'; }, () => { outcome = 'rejected'; });
+  try {
+    await waitFor(async () => { await fs.access(env.CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE); });
+    const publishing = publishHandshake(env.CODEX_DEFAULTS_SEND_RELEASE_FILE, '{"release":true}\n', async () => { opened(); await resumed; });
+    await atOpen;
+    const visibleBeforeWrite = await fs.access(env.CODEX_DEFAULTS_SEND_RELEASE_FILE).then(() => true, () => false);
+    // Allow several actual consumer polls while the publisher is held.
+    await new Promise(resolve => setTimeout(resolve, 80)); const whilePaused = outcome;
+    resume(); await publishing; await barrier;
+    expect(visibleBeforeWrite).toBe(false); expect(whilePaused).toBe('pending'); expect(outcome).toBe('resolved');
+    await expect(publishHandshake(env.CODEX_DEFAULTS_SEND_RELEASE_FILE, 'replacement')).rejects.toMatchObject({ code: 'EEXIST' });
+    expect(await fs.readFile(env.CODEX_DEFAULTS_SEND_RELEASE_FILE, 'utf8')).toBe('{"release":true}\n');
+    expect((await fs.readdir(dir)).sort()).toEqual(['display.json', 'release.json']);
+  } finally { resume(); await barrier; await fs.rm(dir, { recursive: true, force: true }); }
 });
