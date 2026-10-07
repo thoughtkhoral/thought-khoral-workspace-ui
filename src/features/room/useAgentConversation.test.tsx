@@ -289,3 +289,22 @@ it.each(['revision changed', 'pair removed'] as const)('retains the immutable di
   expect(b.bodies[0].settings).toEqual(displayed); expect(result.current.selectedSettings).toBeNull();
   expect(b.bodies).toHaveLength(1); expect(result.current.isAvailable).toBe(false);
 });
+
+it.each(['catalog unavailable', 'revision mismatch'] as const)('observes restored busy task despite %s and permits reviewed recovery after completion', async failure => {
+  vi.useFakeTimers(); let terminal = false; let catalogRecovered = false; let taskReads = 0; const bodies: unknown[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.body) { bodies.push(JSON.parse(String(init.body))); return new Response(JSON.stringify(accepted), { status: 202 }); }
+    if (url.includes('/tasks/')) { taskReads++; terminal = true; return new Response(JSON.stringify(completed)); }
+    if (url.includes('/models')) return failure === 'catalog unavailable' && !catalogRecovered ? new Response('{}', { status: 503 }) : new Response(JSON.stringify({ ...catalog, catalogRevision: !catalogRecovered ? 'changed' : 'catalog-1' }));
+    return new Response(JSON.stringify(terminal ? ready : { ...ready, conversation: { ...ready.conversation, state: 'running', activeTaskId: completed.taskId } }));
+  }));
+  const { result } = renderHook(() => useAgentConversation(options));
+  await act(async () => { for (let index = 0; index < 40; index++) await Promise.resolve(); });
+  expect(result.current.busy).toBe(true); expect(result.current.isAvailable).toBe(false); expect(result.current.selectedSettings).toBeNull();
+  await act(async () => { expect(await result.current.submit(values)).toBe(false); }); expect(bodies).toHaveLength(0);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(taskReads).toBe(1); expect(result.current.task?.state).toBe('completed'); expect(result.current.busy).toBe(false);
+  catalogRecovered = true; await act(async () => { await result.current.refreshSettings(); });
+  expect(result.current.isAvailable).toBe(true); expect(result.current.selectedSettings).toEqual(ready.conversation.selectedSettings);
+  expect(bodies).toHaveLength(0);
+});

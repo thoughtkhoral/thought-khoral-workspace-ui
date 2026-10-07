@@ -8,6 +8,7 @@ import ready from './__fixtures__/ready-view.json';
 import catalog from './__fixtures__/catalog.json';
 import accepted from './__fixtures__/accepted-turn.json';
 import reserved from './__fixtures__/reserved-task.json';
+import completed from './__fixtures__/completed-task.json';
 import defaults from './__fixtures__/resolved-settings.json';
 import failed from '../../../contracts/agent-conversation-v1/fixtures/valid/failed-task.json';
 afterEach(() => {
@@ -364,4 +365,24 @@ it('retains the prompt on stale catalog rejection and requires explicit Refresh 
   const priorReads = requests.length;
   fireEvent.click(screen.getByRole('button', { name: 'Refresh settings' })); await screen.findByText(/Selected for next turn: model-a/);
   expect(requests.length).toBeGreaterThan(priorReads); expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe('@codex-agent retained');
+});
+
+it('reveals Refresh settings after a busy restored task completes despite failed catalog acquisition', async () => {
+  vi.useFakeTimers(); let terminal = false; let catalogRecovered = false; let submits = 0;
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.body) { submits++; return new Response(JSON.stringify(accepted), { status: 202 }); }
+    if (url.includes('/models')) return catalogRecovered ? new Response(JSON.stringify(catalog)) : new Response('{}', { status: 503 });
+    if (url.includes('/tasks/')) { terminal = true; return new Response(JSON.stringify(completed)); }
+    return new Response(JSON.stringify(terminal ? ready : { ...ready, conversation: { ...ready.conversation, state: 'running', activeTaskId: completed.taskId } }));
+  }));
+  render(<Harness />); await flushBoundary();
+  expect(screen.getByText(/Session: busy/)).toBeTruthy(); expect(screen.queryByRole('button', { name: 'Refresh settings' })).toBeNull();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent preserve while busy' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' })); await flushBoundary(); expect(submits).toBe(0);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(screen.getByRole('button', { name: 'Refresh settings' })).toBeTruthy();
+  expect(screen.getByRole('status').textContent).toBe('Codex turn: completed');
+  catalogRecovered = true; fireEvent.click(screen.getByRole('button', { name: 'Refresh settings' })); await flushBoundary();
+  expect(screen.getByText(/Selected for next turn: model-a \/ effort-medium/)).toBeTruthy();
+  expect((screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement).value).toBe('@codex-agent preserve while busy'); expect(submits).toBe(0);
 });

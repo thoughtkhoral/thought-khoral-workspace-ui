@@ -86,7 +86,8 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
     return () => { ++epoch.current; ++settingsSequence.current; };
   }, [enabled, roomId, agentId, api, modelSelection, reasoningEffort]);
   useEffect(() => {
-    if (!enabled || !roomId || !activeTask || !isAvailable) return;
+    // An authenticated active task remains observable when only settings acquisition fails.
+    if (!enabled || !roomId || !activeTask) return;
     const current = epoch.current;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -118,7 +119,7 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [enabled, roomId, agentId, activeTask, isAvailable, api]);
+  }, [enabled, roomId, agentId, activeTask, api]);
   const busy = isSubmitting || activeTask !== null;
   const settingsReady = !supportsSettings || Boolean(selectedSettings && catalog && pairInCatalog(selectedSettings, catalog));
   const needsSettingsSelection = supportsSettings && !settingsReady;

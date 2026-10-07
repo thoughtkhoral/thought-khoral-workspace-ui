@@ -4,6 +4,9 @@ import { expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
 import { CONTRACT_VERSION } from '../../api';
 import { CODEX_AGENT_ID, PROFILE_VERSION, type AcceptedTurn, type SelectedSettings, type TurnRequest } from './conversationApi';
+import ready from './__fixtures__/ready-view.json';
+import catalog from './__fixtures__/catalog.json';
+import acceptedFixture from './__fixtures__/accepted-turn.json';
 import type { RoomWebSocket } from './useRoomSocket';
 
 class SyntheticSocket extends EventTarget implements RoomWebSocket {
@@ -16,8 +19,7 @@ class SyntheticSocket extends EventTarget implements RoomWebSocket {
 }
 const environment = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
 // Task 4 launches one fresh process with generated synthetic credentials and room.
-it.skipIf(environment.RUN_CODEX_DEFAULTS_COMPOSED !== '1')('captures a visible real-HTTP RoomPage defaults submission', async () => {
-  const env = environment;
+async function captureComposedEvidence(env: Record<string, string | undefined>) {
   const origin = env.CODEX_DEFAULTS_BROKER_ORIGIN;
   const roomId = env.CODEX_DEFAULTS_ROOM_ID;
   const token = env.CODEX_DEFAULTS_TOKEN;
@@ -82,7 +84,16 @@ it.skipIf(environment.RUN_CODEX_DEFAULTS_COMPOSED !== '1')('captures a visible r
     } else expect(screen.queryByText(/Selected for next turn:/)).toBeNull();
     fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent synthetic defaults evidence' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-    await waitFor(() => expect(acceptedTurn).not.toBeNull(), { timeout: 10000 });
+    // A raw 202 clone is not evidence of UI acceptance. The composer clears only
+    // after strict schema/binding validation and the hook's successful acceptance.
+    await waitFor(() => {
+      const prompt = screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement;
+      expect(prompt.value === '' || Boolean(screen.queryByRole('alert'))).toBe(true);
+    }, { timeout: 10000 });
+    const prompt = screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement;
+    if (prompt.value !== '') throw new Error('Real UI rejected composed submission');
+    expect((screen.getByRole('button', { name: 'New session' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(acceptedTurn).not.toBeNull();
     const request = submitted as TurnRequest | null;
     const accepted = acceptedTurn as AcceptedTurn | null;
     const submittedSettings = request?.settings ?? null;
@@ -98,4 +109,28 @@ it.skipIf(environment.RUN_CODEX_DEFAULTS_COMPOSED !== '1')('captures a visible r
     await writeFile(evidenceFile, `${JSON.stringify({ phase, capabilities, displayedSettings, submittedSettings, acceptedTurn: accepted, defaultsReads, catalogReads })}\n`, { flag: 'wx' });
     fireEvent.click(screen.getByRole('button', { name: 'Leave room' }));
   } finally { cleanup(); vi.unstubAllGlobals(); socket.close(); }
+}
+it.skipIf(environment.RUN_CODEX_DEFAULTS_COMPOSED !== '1')('captures a visible real-HTTP RoomPage defaults submission', async () => {
+  await captureComposedEvidence(environment);
 }, 20000);
+
+it.each(['wrong room', 'unknown private field'] as const)('writes no composed evidence for rejected 202 with %s', async invalid => {
+  const moduleName = 'node:fs/promises';
+  const { mkdtemp, access, rm } = await import(moduleName) as {
+    mkdtemp: (prefix: string) => Promise<string>; access: (path: string) => Promise<void>;
+    rm: (path: string, options: { recursive: boolean; force: boolean }) => Promise<void>;
+  };
+  const temporary = await mkdtemp('/private/tmp/codex-defaults-invalid-'); const evidenceFile = `${temporary}/evidence.json`;
+  const http = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if (init?.body) return new Response(JSON.stringify({ ...acceptedFixture, ...(invalid === 'wrong room' ? { roomId: '00000001-1111-4111-8111-000000000001' } : { nativeThreadId: 'synthetic-private' }) }), { status: 202 });
+    return new Response(JSON.stringify(String(url).includes('/models') ? catalog : ready));
+  });
+  vi.stubGlobal('fetch', http);
+  try {
+    await expect(captureComposedEvidence({ CODEX_DEFAULTS_BROKER_ORIGIN: 'http://broker.example.test', CODEX_DEFAULTS_ROOM_ID: ready.roomId,
+      CODEX_DEFAULTS_TOKEN: 'synthetic-token', CODEX_DEFAULTS_PHASE: 'restored', CODEX_DEFAULTS_MODEL_SELECTION: 'true',
+      CODEX_DEFAULTS_REASONING_EFFORT: 'true', CODEX_DEFAULTS_EVIDENCE_FILE: evidenceFile })).rejects.toThrow('Real UI rejected composed submission');
+    expect(http.mock.calls.some(([, init]) => Boolean(init?.body))).toBe(true);
+    await expect(access(evidenceFile)).rejects.toMatchObject({ code: 'ENOENT' });
+  } finally { cleanup(); vi.unstubAllGlobals(); await rm(temporary, { recursive: true, force: true }); }
+}, 15000);
