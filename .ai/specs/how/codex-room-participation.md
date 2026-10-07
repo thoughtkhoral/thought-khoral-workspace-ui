@@ -430,3 +430,10 @@ intentional composed-test skip. Platform candidate pin checks passed 26 tests,
 and the provider-free composed smoke passed the 12 rendered UI lifecycle phases
 and 24 synthetic native turns against this exact UI source. No publication,
 provider use, service activation, or push is authorized by this local merge.
+
+### Pushed POC checkpoint — 2026-10-07
+
+The reviewed UI candidate is pushed to GitHub `main` in
+`0c8b599616a94d7dc73b335fb704407e15bbb9cc`. Provider-free UI verification
+passed with one intentional composed-test skip. Packaged-stack and separately
+authorized live verification remain open; this does not claim production readiness.

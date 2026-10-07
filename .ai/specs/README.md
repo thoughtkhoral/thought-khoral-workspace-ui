@@ -55,3 +55,11 @@ After explicit user authorization, the reviewed UI source at
 Candidate and published fixture pins remain distinct; the v1.1 candidate is not
 published. Verification is recorded in the owning How. Provider use, service
 activation, publication, and push remain separate gates.
+
+## Current POC publication checkpoint — 2026-10-07
+
+The reviewed Codex room participation UI and defaults integration is pushed to
+GitHub `main` at `0c8b599616a94d7dc73b335fb704407e15bbb9cc`. The provider-free UI
+suite passed with one intentional composed-test skip. Packaged-stack and
+separately authorized live verification remain open; this experimental POC is
+not claimed production-ready.

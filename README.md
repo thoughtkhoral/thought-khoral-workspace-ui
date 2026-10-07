@@ -100,7 +100,7 @@ transcript once. Leaving clears the local conversation state and stops polling.
 The exact published profile is vendored under `contracts/agent-conversation-v1`.
 `npm run check:contracts` verifies its immutable lock and all 135 file hashes;
 `npm run test:contracts` exercises fixture, extra-file, and lock tampering in a
-temporary copy. The additive defaults schema is pinned as an **unreleased local candidate** under
+temporary copy. The additive defaults schema is pinned as an **unreleased v1.1 candidate** under
 `contracts/agent-conversation-v1.1-candidate`, from contracts commit
 `1ea828f28725ddaaefa21d083473f9abbd777975`. `npm run check:defaults-candidate`
 checks its external lock digest, all 156 payload hashes, and the unchanged
