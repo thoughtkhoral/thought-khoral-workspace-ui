@@ -27,7 +27,7 @@ export function CodexConversationControls({
   capabilities = { modelSelection: true, reasoningEffort: true, usage: true },
 }: ControlsProps) {
   const state = conversation.view?.conversation;
-  const chosen = conversation.draftSettings ?? conversation.submittedSettings ?? state?.selectedSettings;
+  const chosen = conversation.draftSettings ?? (conversation.newSession ? undefined : conversation.submittedSettings ?? state?.selectedSettings);
   const model = conversation.catalog?.data.find(option => option.id === chosen?.model);
   const effective = conversation.pendingConfirmation
     ? null
@@ -84,6 +84,9 @@ export function CodexConversationControls({
           />
         </StackItem>
       )}
+      {conversation.needsSettingsSelection && !conversation.busy && (
+        <StackItem><Content component="p">Choose a model and reasoning effort before starting a new session.</Content></StackItem>
+      )}
       {capabilities.modelSelection && conversation.catalog && conversation.catalog.data.length > 0 && (
         <StackItem>
           <FormGroup label="Model" fieldId="codex-model">
@@ -94,7 +97,7 @@ export function CodexConversationControls({
               disabled={disableControls}
               onChange={event => conversation.selectModel(event.target.value)}
             >
-              <option value="">Server default</option>
+              <option value="" disabled>Choose a model</option>
               {conversation.catalog.data.map(option => (
                 <option key={option.id} value={option.id}>{option.displayName}</option>
               ))}
@@ -135,7 +138,7 @@ export function CodexConversationControls({
           <Content component="p">
             Selected for next turn: {chosen
               ? `${chosen.model} / ${chosen.reasoningEffort}${conversation.draftSettings ? ' (unsent)' : ''}`
-              : 'server defaults'}
+              : 'choose a model and reasoning effort'}
           </Content>
           <Content component="p">
             Active settings: {effective?.confirmation === 'confirmed'

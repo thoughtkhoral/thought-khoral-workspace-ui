@@ -34,7 +34,8 @@ function Harness({ onChat = vi.fn(), capabilities, roster = participants }: {
     agentId: CODEX_AGENT_ID,
     enabled: true,
     getAccessToken: async () => 'synthetic-token',
-    api: api
+    api: api,
+    loadModels: capabilities ? capabilities.modelSelection || capabilities.reasoningEffort : true
   });
   return <><CodexConversationControls conversation={conversation} capabilities={capabilities} /><MentionComposer
     participants={roster}
@@ -181,6 +182,8 @@ it('acknowledges shared reset then requests a fresh thread and disables controls
   expect(requests.filter(r => r.body)).toHaveLength(0);
   await waitFor(() => expect((screen.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-a' } });
+  fireEvent.click(screen.getByRole('checkbox', { name: /supported effort default/i }));
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   await waitFor(() => expect(requests.filter(r => r.body)).toHaveLength(1));
   expect(requests.find(r => r.body)!.body!.conversation).toEqual({ mode: 'new' });
@@ -257,6 +260,8 @@ it.each([
   expect(screen.queryByRole('button', { name: 'Continue session' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'New session' }));
   fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'model-a' } });
+  fireEvent.click(screen.getByRole('checkbox', { name: /supported effort default/i }));
   fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent recover' } });
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   await flushBoundary();
@@ -310,4 +315,47 @@ it('keeps a new model unconfirmed and usage unavailable until that task supplies
   await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
   expect(screen.getByText(/Active settings/).textContent).toBe('Active settings: model-b / low (confirmed)');
   expect(screen.getByText(/context estimate/).textContent).toContain('240 / 1,000 tokens (24%; fresh; model-b;');
+});
+
+
+it.each([
+  ['initial', false], ['initial', true], ['reset', false], ['reset', true]
+] as const)('requires a deliberate visible pair for %s (multiple options=%s)', async (mode, multiple) => {
+  const requests = boundary({ extraModel: multiple, view: mode === 'initial' ? { ...ready, conversation: null } : ready });
+  render(<Harness />);
+  await screen.findByRole('combobox', { name: 'Model' });
+  if (mode === 'reset') {
+    fireEvent.click(screen.getByRole('button', { name: 'New session' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /shared thread/i }));
+    expect(screen.getByText(/Active settings/).textContent).toContain('model-a / effort-medium');
+  }
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent deliberate pair' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await flushBoundary();
+  expect(requests.filter(request => request.body)).toHaveLength(0);
+  expect((screen.getByRole('combobox', { name: 'Model' }) as HTMLSelectElement).value).toBe('');
+  const model = multiple ? 'model-b' : 'model-a';
+  const effort = multiple ? 'low' : 'effort-medium';
+  fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: model } });
+  expect((screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement).value).toBe(effort);
+  expect(screen.getByText(/Selected for next turn/).textContent).toContain(`${model} / ${effort}`);
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await flushBoundary();
+  expect(requests.filter(request => request.body)).toHaveLength(0);
+  fireEvent.click(screen.getByRole('checkbox', { name: /supported effort default/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(request => request.body)).toHaveLength(1));
+  expect(requests.find(request => request.body)!.body!.settings).toEqual({ model, reasoningEffort: effort, catalogRevision: 'catalog-1' });
+  expect(requests.find(request => request.body)!.body!.conversation).toEqual({ mode: 'new' });
+});
+
+it('permits initial invocation for a capability without settings controls', async () => {
+  const requests = boundary({ view: { ...ready, conversation: null } });
+  render(<Harness capabilities={{ modelSelection: false, reasoningEffort: false, usage: false }} />);
+  await flushBoundary();
+  expect(screen.queryByRole('combobox', { name: 'Model' })).toBeNull();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent capability' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(requests.filter(request => request.body)).toHaveLength(1));
+  expect(requests.find(request => request.body)!.body!.settings).toBeUndefined();
 });

@@ -177,3 +177,20 @@ passed 116 tests in 12 files, the production build, and the visible room preview
 with 19 retained ChatStream tests. The 135-file artifact pin and tamper checks
 passed; npm audit reported zero vulnerabilities. The existing large-chunk build
 advisory and the deployment/provider verification limits above remain unchanged.
+
+
+## Published-v1 fresh-selection safety correction (2026-10-07)
+
+A settings-capable initial invocation or explicit New/reset requires a deliberate
+valid model/effort selection before submission. Fresh-mode pickers start blank,
+including when only one model/effort is available; the previous session's pair
+remains only in the runtime-confirmed header. A model's supported default effort
+is displayed and must be acknowledged (or explicitly changed) before sending.
+The visible selected pair is sent atomically. A capability without settings
+continues without these controls. Continuations use accepted shared defaults.
+
+The published catalog does not disclose the deployment-default model when no
+conversation exists. This guard satisfies concrete selection and prevents an
+unseen default from running, but automatic resolved-default display remains a
+pending design gap under the approved root How. No default is inferred from
+catalog order; no new endpoint or changed published artifact is implemented.

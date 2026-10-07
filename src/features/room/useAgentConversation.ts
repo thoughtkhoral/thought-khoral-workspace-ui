@@ -141,11 +141,16 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
     };
   }, [enabled, roomId, agentId, activeTask, isAvailable, api]);
   const busy = isSubmitting || activeTask !== null;
+  const freshSelection = newSession || !view?.conversation;
+  const validDraft = Boolean(draftSettings && catalog && draftSettings.catalogRevision === catalog.catalogRevision &&
+    catalog.data.some(model => model.id === draftSettings.model &&
+      model.supportedReasoningEfforts.some(effort => effort.id === draftSettings.reasoningEffort)));
+  const needsSettingsSelection = loadModels && freshSelection && !validDraft;
   const selectModel = (modelId: string) => {
     if (busy || !catalog) return;
     const model = catalog.data.find(option => option.id === modelId);
     if (!model) return;
-    const oldEffort = draftSettings?.reasoningEffort ?? view?.conversation?.selectedSettings?.reasoningEffort;
+    const oldEffort = draftSettings?.reasoningEffort ?? (freshSelection ? undefined : view?.conversation?.selectedSettings?.reasoningEffort);
     const retained = model.supportedReasoningEfforts.some(effort => effort.id === oldEffort);
     const nextEffort = retained ? oldEffort : model.defaultReasoningEffort;
     if (!nextEffort) {
@@ -157,7 +162,7 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
   };
   const selectEffort = (effortId: string) => {
     if (busy || !catalog) return;
-    const modelId = draftSettings?.model ?? view?.conversation?.selectedSettings?.model;
+    const modelId = draftSettings?.model ?? (freshSelection ? undefined : view?.conversation?.selectedSettings?.model);
     const model = catalog.data.find(option => option.id === modelId);
     if (!model?.supportedReasoningEfforts.some(effort => effort.id === effortId)) return;
     setDraftSettings({ model: model.id, reasoningEffort: effortId, catalogRevision: catalog.catalogRevision });
@@ -169,7 +174,7 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
       setError(new ConversationError('invalid_task_input'));
       return false;
     }
-    if (needsEffortAcknowledgement || (newSession && !resetAcknowledged)) return false;
+    if (needsSettingsSelection || (draftSettings && !validDraft) || needsEffortAcknowledgement || (newSession && !resetAcknowledged)) return false;
     const current = epoch.current;
     submitLock.current = true;
     setIsSubmitting(true);
@@ -181,6 +186,7 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
       if (epoch.current !== current) return false;
       setServerView(restored);
       const state = restored.conversation;
+      if (loadModels && (newSession || !state) && !validDraft) return false;
       if (state?.activeTaskId) throw new ConversationError('conversation_busy');
       if (state?.state === 'unusable' && !newSession) throw new ConversationError('session_unavailable');
       const accepted = await api.sendTurn(token, {
@@ -230,6 +236,7 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
     selectModel,
     selectEffort,
     needsEffortAcknowledgement,
+    needsSettingsSelection,
     submittedSettings: activeTask?.selectedSettings,
     pendingConfirmation: Boolean(activeTask && !task && view?.conversation?.activeTaskId !== activeTask.taskId),
     acknowledgeEffort: () => setNeedsEffortAcknowledgement(false),
@@ -238,12 +245,16 @@ export function useAgentConversation({ roomId, agentId, enabled, getAccessToken,
     chooseNewSession: () => {
       if (!busy) {
         setNewSession(true);
+        setDraftSettings(null);
+        setNeedsEffortAcknowledgement(false);
         setResetAcknowledged(false);
       }
     },
     continueSession: () => {
       if (!busy) {
         setNewSession(false);
+        setDraftSettings(null);
+        setNeedsEffortAcknowledgement(false);
         setResetAcknowledged(false);
       }
     },
