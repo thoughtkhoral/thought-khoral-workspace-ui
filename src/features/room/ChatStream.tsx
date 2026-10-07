@@ -12,13 +12,15 @@ import type { ChatMention, ChatSendValues, RoomAgentTask, RoomEvent, RoomMessage
 import './ChatStream.css';
 import { MentionComposer } from './MentionComposer';
 import { mentionTokens } from './mentions';
+import type { AgentConversation } from './useAgentConversation';
 
 export interface ChatStreamProps {
   messages: readonly RoomMessage[];
   tasks?: readonly RoomAgentTask[];
   sourceEvents?: readonly RoomEvent[];
   participants: readonly RoomParticipant[];
-  onSendMessage: (values: ChatSendValues) => void;
+  onSendMessage: (values: ChatSendValues) => void | boolean | Promise<void | boolean>;
+  conversation?: AgentConversation;
   onCommand?: (command: 'decisions') => void;
   canManageDecisions?: boolean;
   isConnected: boolean;
@@ -33,6 +35,7 @@ export function ChatStream({
   onCommand,
   canManageDecisions = false,
   isConnected,
+  conversation,
 }: ChatStreamProps) {
   const [commandError, setCommandError] = useState<string | null>(null);
 
@@ -55,7 +58,7 @@ export function ChatStream({
       return;
     }
 
-    onSendMessage(values);
+    return onSendMessage(values);
   };
 
   const mentionLabel = (mention: ChatMention) => {
@@ -191,7 +194,7 @@ export function ChatStream({
             {commandError}
           </Alert>
         )}
-        <MentionComposer participants={participants} isConnected={isConnected} onSend={submitMessage} />
+        <MentionComposer participants={participants} isConnected={isConnected} onSend={submitMessage} conversation={conversation} />
       </ChatbotFooter>
     </Chatbot>
   );

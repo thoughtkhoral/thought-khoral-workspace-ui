@@ -287,8 +287,8 @@ isolated consumers may pin a reproducible local candidate from an exact committe
 contracts revision, verified archive and per-file SHA-256 values, clearly marked
 unreleased. This exception is only for this amendment's local pre-publication
 development and synthetic testing. Published v1.0 provenance/bytes remain intact.
-No release publication, shipped interoperability, merge, push, provider use or
-service activation is authorized. Whole milestone/Task9 acceptance remains open.
+This local merge does not authorize release publication, shipped interoperability,
+push, provider use or service activation. Whole milestone/Task9 acceptance remains open.
 
 ## Defaults discovery local synthetic checkpoint — 2026-10-07
 
@@ -363,3 +363,70 @@ candidate passed the mixed-capability defaults/lifecycle matrix; the workspace
 UI default branch retains its prior runtime. Candidate contract publication,
 packaged-stack verification, and authorized live-provider evidence remain
 pending. See the [coordinated checkpoint](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/codex-room-conversations-implementation-plan.md).
+## Published-v1 fresh-selection safety correction (2026-10-07)
+
+A settings-capable initial invocation or explicit New/reset requires a deliberate
+valid model/effort selection before submission. Fresh-mode pickers start blank,
+including when only one model/effort is available; the previous session's pair
+remains only in the runtime-confirmed header. A model's supported default effort
+is displayed and must be acknowledged (or explicitly changed) before sending.
+The visible selected pair is sent atomically. A capability without settings
+continues without these controls. Continuations use accepted shared defaults.
+
+The published catalog does not disclose the deployment-default model when no
+conversation exists. This guard satisfies concrete selection and prevents an
+unseen default from running, but automatic resolved-default display remains a
+pending design gap under the approved root How. No default is inferred from
+catalog order; no new endpoint or changed published artifact is implemented.
+
+### Task 3 local implementation checkpoint — 2026-10-07
+
+The browser consumes only the candidate's new `ResolvedSettingsView` schema,
+registering its reference to the existing published turn schema once. The released
+135-file vendor and published pin checker remain unchanged. The local candidate
+has 156 exact payload files, contracts commit
+`1ea828f28725ddaaefa21d083473f9abbd777975`, archive SHA-256
+`fab59a486f6498b843467202debcb0768403bd57ba7dda41be2a01e5f23fdda8`, and lock SHA-256
+`7914d32eae2487879a68405b5095a6b9aa91355f87529c43f4055844821902a9`.
+The defaults client shares the published bounded strict parser and authenticated,
+no-store, credential-free, redirect-rejecting HTTP wrapper. It checks request
+room/agent bindings and rejects mismatched explicit acceptance settings.
+
+Settings acquisition restores authenticated conversation state, traverses at most
+100 catalog pages, and obtains defaults only for absent or explicit New sessions.
+A concrete pair is validated against the complete catalog before enabling submit.
+Room epochs and settings-request sequences reject delayed discovery after New,
+Continue, later edits, Leave, room switching or authentication loss. Independent
+primitive capabilities govern both hook edits and controls. The sole selected
+pair supplies editable/read-only values and the explicit request. Submission
+captures that displayed pair before its server-generation refresh, never querying
+deployment defaults again. Neither capability keeps catalog/default reads and
+submitted settings absent. New retains shared-reset acknowledgement.
+
+Stale, removed or unresolved pairs become unavailable without guessing a model.
+Refresh settings is a single bounded human action; a persisted allowed model/effort
+can be reviewed against a changed revision without mutating stored state before
+acceptance. Rejections retain the draft and never replay automatically. Cached
+catalog edits and Continue cannot revive failed discovery without that review.
+
+Synthetic regression coverage includes all four capability combinations across
+initial, restored and New phases, F1 effort-only editing/submission, bounded catalog
+failures, absent/removed/revision mismatches, policy-only changes, prompt retention,
+immutable explicit acceptance and async discovery cancellation. The composed child
+is opt-in and uses real HTTP responses with actual RoomPage/ChatStream/controls,
+records the DOM pair before Send plus real acceptance in fresh temporary evidence,
+and then Leaves. A normal-suite skip is expected; Task 4 owns actual composed
+execution. Publication, provider calls, activation, image/native/tool-policy changes,
+merge and push remain outside this checkpoint.
+
+## Local main integration checkpoint — 2026-10-07
+
+The reviewed UI candidate at source commit
+`79e5e7310a450efea561548cd87871446c1939aa` is integrated into this repository's
+local `main` under the user's explicit merge authorization. Published v1.0
+contract bytes remain unchanged; the v1.1 defaults contract remains an
+unreleased local candidate. Fresh `npm test` passed 193 tests with one
+intentional composed-test skip. Platform candidate pin checks passed 26 tests,
+and the provider-free composed smoke passed the 12 rendered UI lifecycle phases
+and 24 synthetic native turns against this exact UI source. No publication,
+provider use, service activation, or push is authorized by this local merge.
