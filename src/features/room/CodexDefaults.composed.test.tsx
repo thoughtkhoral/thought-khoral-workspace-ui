@@ -18,6 +18,30 @@ class SyntheticSocket extends EventTarget implements RoomWebSocket {
   receive(data: unknown) { this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) })); }
 }
 const environment = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
+// Test-only filesystem handshake: fresh files in the fixture-owned evidence directory.
+async function displayBarrier(env: Record<string, string | undefined>, display: unknown, timeout = 10000) {
+  const displayFile = env.CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE;
+  const releaseFile = env.CODEX_DEFAULTS_SEND_RELEASE_FILE;
+  if (!displayFile && !releaseFile) return;
+  if (!displayFile || !releaseFile || displayFile === releaseFile) throw new Error('Incomplete display/send barrier');
+  const fsModule = 'node:fs/promises'; const pathModule = 'node:path';
+  const fs = await import(fsModule) as { access: (path: string) => Promise<void>; writeFile: (path: string, data: string, options: { flag: string }) => Promise<void>; readFile: (path: string, encoding: string) => Promise<string> };
+  const { dirname, isAbsolute } = await import(pathModule) as { dirname: (path: string) => string; isAbsolute: (path: string) => boolean };
+  if (![displayFile, releaseFile].every(path => isAbsolute(path) && dirname(path) === dirname(env.CODEX_DEFAULTS_EVIDENCE_FILE ?? ''))) throw new Error('Barrier must share owned evidence directory');
+  try { await fs.access(releaseFile); throw new Error('Send release already exists'); }
+  catch (error) { if ((error as { code?: string }).code !== 'ENOENT') throw error; }
+  await fs.writeFile(displayFile, `${JSON.stringify(display)}\n`, { flag: 'wx' });
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    try {
+      const release = await fs.readFile(releaseFile, 'utf8');
+      if (release !== '{"release":true}\n') throw new Error('Invalid send release');
+      return;
+    } catch (error) { if ((error as { code?: string }).code !== 'ENOENT') throw error; }
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  throw new Error('Display/send barrier timed out');
+}
 // Task 4 launches one fresh process with generated synthetic credentials and room.
 async function captureComposedEvidence(env: Record<string, string | undefined>) {
   const origin = env.CODEX_DEFAULTS_BROKER_ORIGIN;
@@ -37,13 +61,18 @@ async function captureComposedEvidence(env: Record<string, string | undefined>) 
   const realFetch = globalThis.fetch;
   let defaultsReads = 0; let catalogReads = 0;
   let submitted: TurnRequest | null = null; let acceptedTurn: AcceptedTurn | null = null;
+  let rejection: { status: number; profileError: { profileVersion: string; requestId: string | null; code: string; message: string } } | null = null;
+  let submissions = 0;
+  const expectedRejection = env.CODEX_DEFAULTS_EXPECT_REJECTION;
+  if (expectedRejection && !['invalid_task_input', 'conversation_stale'].includes(expectedRejection)) throw new Error('Unexpected synthetic rejection code');
   vi.stubGlobal('fetch', async (url: string | URL | Request, init?: RequestInit) => {
     const pathname = new URL(String(url)).pathname;
     if (pathname.endsWith('/defaults')) defaultsReads++;
     if (pathname.endsWith('/models')) catalogReads++;
-    if (pathname.endsWith('/turns') && init?.body) submitted = JSON.parse(String(init.body));
+    if (pathname.endsWith('/turns') && init?.body) { submitted = JSON.parse(String(init.body)); submissions++; }
     const response = await realFetch(url, init);
     if (pathname.endsWith('/turns') && response.status === 202) acceptedTurn = await response.clone().json();
+    else if (pathname.endsWith('/turns')) rejection = { status: response.status, profileError: await response.clone().json() };
     return response;
   });
   const socket = new SyntheticSocket();
@@ -83,6 +112,7 @@ async function captureComposedEvidence(env: Record<string, string | undefined>) 
       if (!reasoningEffort) expect(screen.getByLabelText('Reasoning effort (read only)').textContent).toContain(displayedSettings.reasoningEffort);
     } else expect(screen.queryByText(/Selected for next turn:/)).toBeNull();
     fireEvent.change(screen.getByRole('combobox', { name: 'Message' }), { target: { value: '@codex-agent synthetic defaults evidence' } });
+    await displayBarrier(env, { phase, capabilities, displayedSettings, prompt: '@codex-agent synthetic defaults evidence' });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     // A raw 202 clone is not evidence of UI acceptance. The composer clears only
     // after strict schema/binding validation and the hook's successful acceptance.
@@ -91,6 +121,27 @@ async function captureComposedEvidence(env: Record<string, string | undefined>) 
       expect(prompt.value === '' || Boolean(screen.queryByRole('alert'))).toBe(true);
     }, { timeout: 10000 });
     const prompt = screen.getByRole('combobox', { name: 'Message' }) as HTMLTextAreaElement;
+    if (expectedRejection) {
+      await screen.findByRole('button', { name: 'Refresh settings' });
+      expect(prompt.value).toBe('@codex-agent synthetic defaults evidence');
+      const sendBlocked = (screen.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled;
+      expect(sendBlocked).toBe(true);
+      expect(screen.queryByText(/Selected for next turn:/)).toBeNull();
+      expect(acceptedTurn).toBeNull(); expect(submissions).toBe(1);
+      const refused = rejection as { status: number; profileError: { profileVersion: string; requestId: string | null; code: string; message: string } } | null;
+      expect(refused).not.toBeNull(); expect(refused!.status).toBeGreaterThanOrEqual(400); expect(refused!.status).toBeLessThan(500);
+      expect(Object.keys(refused!.profileError).sort()).toEqual(['code', 'message', 'profileVersion', 'requestId']);
+      expect(refused!.profileError.profileVersion).toBe(PROFILE_VERSION); expect(refused!.profileError.code).toBe(expectedRejection);
+      expect((submitted as TurnRequest | null)?.settings).toEqual(displayedSettings);
+      expect(defaultsReads).toBe(phase === 'restored' ? 0 : 1); expect(catalogReads).toBe(1);
+      // Closed safe protocol error from actual HTTP; contains no transport headers.
+      const fileSystemModule = 'node:fs/promises';
+      const { writeFile } = await import(fileSystemModule) as { writeFile: (path: string, data: string, options: { flag: string }) => Promise<void> };
+      await writeFile(evidenceFile, `${JSON.stringify({ phase, capabilities, displayedSettings, submittedSettings: (submitted as TurnRequest | null)?.settings, rejection: refused,
+        promptRetained: true, refreshRequired: true, sendBlocked, defaultsReads, catalogReads })}\n`, { flag: 'wx' });
+      fireEvent.click(screen.getByRole('button', { name: 'Leave room' }));
+      return;
+    }
     if (prompt.value !== '') throw new Error('Real UI rejected composed submission');
     expect((screen.getByRole('button', { name: 'New session' }) as HTMLButtonElement).disabled).toBe(true);
     expect(acceptedTurn).not.toBeNull();
@@ -138,3 +189,21 @@ it.each(['wrong room', 'unknown private field'] as const)('writes no composed ev
     await expect(access(evidenceFile)).rejects.toMatchObject({ code: 'ENOENT' });
   } finally { cleanup(); vi.unstubAllGlobals(); await rm(temporary, { recursive: true, force: true }); }
 }, 15000);
+
+it('refuses incomplete, stale and timed-out display/send handshakes', async () => {
+  await expect(displayBarrier({ CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE: '/missing/display' }, {})).rejects.toThrow('Incomplete display/send barrier');
+  const fsModule = 'node:fs/promises'; const osModule = 'node:os'; const pathModule = 'node:path';
+  const fs = await import(fsModule) as { mkdtemp: (prefix: string) => Promise<string>; writeFile: (path: string, data: string) => Promise<void>; access: (path: string) => Promise<void>; rm: (path: string, options: { recursive: boolean; force: boolean }) => Promise<void> };
+  const { tmpdir } = await import(osModule) as { tmpdir: () => string }; const { join } = await import(pathModule) as { join: (...parts: string[]) => string };
+  const dir = await fs.mkdtemp(join(tmpdir(), 'codex-barrier-'));
+  const env = { CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE: join(dir, 'display.json'), CODEX_DEFAULTS_SEND_RELEASE_FILE: join(dir, 'release.json'), CODEX_DEFAULTS_EVIDENCE_FILE: join(dir, 'result.json') };
+  try {
+    await fs.writeFile(env.CODEX_DEFAULTS_SEND_RELEASE_FILE, '{"release":true}\n');
+    await expect(displayBarrier(env, {}, 25)).rejects.toThrow('already exists');
+    await expect(fs.access(env.CODEX_DEFAULTS_DISPLAY_EVIDENCE_FILE)).rejects.toMatchObject({ code: 'ENOENT' });
+    await fs.rm(env.CODEX_DEFAULTS_SEND_RELEASE_FILE, { recursive: false, force: false });
+    await expect(displayBarrier(env, {}, 25)).rejects.toThrow('timed out');
+    await expect(fs.access(env.CODEX_DEFAULTS_EVIDENCE_FILE)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(displayBarrier(env, {}, 25)).rejects.toMatchObject({ code: 'EEXIST' });
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
