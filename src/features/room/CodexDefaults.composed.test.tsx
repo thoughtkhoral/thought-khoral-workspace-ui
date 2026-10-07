@@ -120,13 +120,17 @@ it.each(['wrong room', 'unknown private field'] as const)('writes no composed ev
     mkdtemp: (prefix: string) => Promise<string>; access: (path: string) => Promise<void>;
     rm: (path: string, options: { recursive: boolean; force: boolean }) => Promise<void>;
   };
-  const temporary = await mkdtemp('/private/tmp/codex-defaults-invalid-'); const evidenceFile = `${temporary}/evidence.json`;
+  const osModule = 'node:os'; const pathModule = 'node:path';
+  const { tmpdir } = await import(osModule) as { tmpdir: () => string };
+  const { join } = await import(pathModule) as { join: (...parts: string[]) => string };
+  const temporary = await mkdtemp(join(tmpdir(), 'codex-defaults-invalid-')); const evidenceFile = join(temporary, 'evidence.json');
   const http = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     if (init?.body) return new Response(JSON.stringify({ ...acceptedFixture, ...(invalid === 'wrong room' ? { roomId: '00000001-1111-4111-8111-000000000001' } : { nativeThreadId: 'synthetic-private' }) }), { status: 202 });
     return new Response(JSON.stringify(String(url).includes('/models') ? catalog : ready));
   });
   vi.stubGlobal('fetch', http);
   try {
+    expect(temporary.startsWith(join(tmpdir(), 'codex-defaults-invalid-'))).toBe(true);
     await expect(captureComposedEvidence({ CODEX_DEFAULTS_BROKER_ORIGIN: 'http://broker.example.test', CODEX_DEFAULTS_ROOM_ID: ready.roomId,
       CODEX_DEFAULTS_TOKEN: 'synthetic-token', CODEX_DEFAULTS_PHASE: 'restored', CODEX_DEFAULTS_MODEL_SELECTION: 'true',
       CODEX_DEFAULTS_REASONING_EFFORT: 'true', CODEX_DEFAULTS_EVIDENCE_FILE: evidenceFile })).rejects.toThrow('Real UI rejected composed submission');
