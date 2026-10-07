@@ -124,9 +124,18 @@ async function captureComposedEvidence(env: Record<string, string | undefined>) 
     if (expectedRejection) {
       await screen.findByRole('button', { name: 'Refresh settings' });
       expect(prompt.value).toBe('@codex-agent synthetic defaults evidence');
-      const sendBlocked = (screen.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled;
-      expect(sendBlocked).toBe(true);
-      expect(screen.queryByText(/Selected for next turn:/)).toBeNull();
+      // Invocation is blocked by the real submission guard; the shared room
+      // composer still has an enabled button for ordinary room messages.
+      const beforeRepeat = submissions;
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Send message' })); });
+      const sendBlocked = submissions === beforeRepeat;
+      expect(sendBlocked).toBe(true); expect(submissions).toBe(1);
+      expect(prompt.value).toBe('@codex-agent synthetic defaults evidence');
+      expect(screen.getByRole('button', { name: 'Refresh settings' })).toBeTruthy();
+      const unavailableSelection = screen.getByText(/Selected for next turn:/);
+      expect(unavailableSelection.textContent).toBe('Selected for next turn: choose a model and reasoning effort');
+      expect(unavailableSelection.dataset.catalogRevision).toBeUndefined();
+      expect(socket.sent.map(value => JSON.parse(value).method).filter(method => method === 'chat.send')).toHaveLength(0);
       expect(acceptedTurn).toBeNull(); expect(submissions).toBe(1);
       const refused = rejection as { status: number; profileError: { profileVersion: string; requestId: string | null; code: string; message: string } } | null;
       expect(refused).not.toBeNull(); expect(refused!.status).toBeGreaterThanOrEqual(400); expect(refused!.status).toBeLessThan(500);
