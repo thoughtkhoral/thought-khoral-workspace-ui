@@ -116,4 +116,13 @@ A static-preview smoke check must build the application, install a `thoughtKhora
 
 ## Authenticated browser transport boundary
 
-`RoomPage` accepts `getAccessToken` and an authenticated `createSocket(url, accessToken)` adapter from its OIDC-enabled host. The hook acquires a fresh token before each connection attempt and never persists, logs, renders, or places it in a URL. A native browser `WebSocket` cannot set an `Authorization` header, so the host adapter and deployment edge must establish the gateway-compatible authenticated upgrade (for example through a same-origin session or a narrowly scoped WebSocket ticket). Task 8 must exercise that adapter against the live gateway; the UI does not invent an incompatible query-token convention.
+`RoomPage` accepts `getAccessToken` and an authenticated
+`createSocket(url, accessToken)` adapter from its OIDC-enabled host. The hook
+acquires a fresh token before each connection attempt and never persists, logs,
+renders, or places it in a URL. Under the accepted [host contract](../what/mvp-ui.md),
+the host performs `session.authenticate` as the first application exchange on
+the WebSocket before exposing the authenticated socket for `room.join`.
+The [platform acceptance criteria](https://github.com/thoughtkhoral/thought-khoral-platform/blob/main/.ai/specs/what/local-mvp.md)
+and its implementation design govern that exchange. The passing deterministic
+HTTP/WebSocket smoke is separate from the still-open Codex Task 9 rendered-browser
+and opt-in packaged-stack acceptance gates.

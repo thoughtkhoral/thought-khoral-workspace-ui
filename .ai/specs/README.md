@@ -6,6 +6,18 @@ See the [root specification index](https://github.com/thoughtkhoral/thought-khor
 
 For the coordinated Codex conversation status across all projects, see the [shared status guide](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/codex-conversation-status.md).
 
+## Current verification scope — 2026-11-19
+
+See the [owning current checkpoint](how/codex-room-participation.md#current-ui-verification-scope--2026-11-19) for source publication and
+verification attribution. The integrated Codex candidate is pushed on `main`;
+F1/defaults discovery are accepted within their composed synthetic scope.
+Final-lock native Linux worker acceptance is recorded in the coordinated plan,
+but Task 9 opt-in packaged room-stack, rendered-browser/Keycloak, live-provider,
+v1.1 contract publication and production/release gates remain open.
+
+The dated entries below preserve the sequence of local review, integration and
+publication. Local-only/unmerged wording applies to those historical checkpoints.
+
 ## Local areas
 
 - [What: MVP workspace UI](what/mvp-ui.md)
@@ -58,7 +70,7 @@ Candidate and published fixture pins remain distinct; the v1.1 candidate is not
 published. Verification is recorded in the owning How. Provider use, service
 activation, publication, and push remain separate gates.
 
-## Current POC publication checkpoint — 2026-10-07
+## POC publication checkpoint — 2026-10-07
 
 The reviewed Codex room participation UI and defaults integration is pushed to
 GitHub `main` at `0c8b599616a94d7dc73b335fb704407e15bbb9cc`. The provider-free UI

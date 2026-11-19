@@ -180,7 +180,7 @@ advisory and the deployment/provider verification limits above remain unchanged.
 
 ## Task 9 synthetic verification and correction checkpoint — 2026-10-07
 
-The following defaults-discovery amendment status supersedes this pre-amendment F1/default-discovery disposition; Task 9 remains open for release gates.
+This is a historical pre-amendment snapshot. The later defaults-discovery amendment supersedes its F1/default-discovery disposition, and the integration/publication checkpoints supersede local-only source status. Task 9 remains open for release gates.
 
 Provider-free checkpoint only; Task 9 and the milestone remain open.
 
@@ -365,6 +365,9 @@ packaged-stack verification, and authorized live-provider evidence remain
 pending. See the [coordinated checkpoint](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/codex-room-conversations-implementation-plan.md).
 ## Published-v1 fresh-selection safety correction (2026-10-07)
 
+Historical published-v1 fallback design; the approved defaults-discovery amendment
+and Task 3 checkpoint below govern the integrated unreleased v1.1 candidate.
+
 A settings-capable initial invocation or explicit New/reset requires a deliberate
 valid model/effort selection before submission. Fresh-mode pickers start blank,
 including when only one model/effort is available; the previous session's pair
@@ -437,3 +440,19 @@ The reviewed UI candidate is pushed to GitHub `main` in
 `0c8b599616a94d7dc73b335fb704407e15bbb9cc`. Provider-free UI verification
 passed with one intentional composed-test skip. Packaged-stack and separately
 authorized live verification remain open; this does not claim production readiness.
+
+## Current UI verification scope — 2026-11-19
+
+The integrated UI/defaults candidate remains pushed on `main`; the reviewed
+runtime source and provider-free results are recorded in the 2026-10-07
+integration/publication checkpoints above. F1 and defaults discovery are
+accepted within the composed synthetic scope. Statements that the original
+checkout retains its prior runtime or candidate branches are unmerged describe
+earlier checkpoints, not current integration status.
+
+The [coordinated plan](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/codex-room-conversations-implementation-plan.md)
+now records successful final-lock native worker Linux acceptance. That worker
+result adds no UI/browser acceptance: Task 9 opt-in packaged room-stack,
+rendered-browser/Keycloak, live-provider and whole-milestone verification remain
+open. The v1.1 defaults contract remains unreleased; image publication and
+production/release acceptance are also open. No UI test rerun is claimed here.
