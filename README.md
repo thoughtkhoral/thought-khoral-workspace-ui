@@ -10,6 +10,12 @@ MVP / active development.
 
 For the cross-project Codex conversation status and remaining gates, see the [shared status guide](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/codex-conversation-status.md).
 
+The [current UI checkpoint](.ai/specs/how/codex-room-participation.md#current-ui-verification-scope--2026-11-19)
+records the integrated/pushed Codex/defaults candidate and its provider-free
+synthetic acceptance. The v1.1 contract remains unreleased. Task 9 opt-in
+packaged-stack, rendered-browser/Keycloak, live-provider and production/release
+acceptance remain open; separate native Linux worker results add no UI coverage.
+
 ## Prerequisites and verification
 
 Use Node.js `^20.19.0` or `>=22.12.0` and npm:
