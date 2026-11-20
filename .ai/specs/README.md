@@ -1,12 +1,30 @@
 # ThoughtKhoral workspace UI specifications
 
+## Current workspace state — 2026-11-20
+
+Released-v1.1 defaults consumption is implemented and reviewed at local source `29a940012adfeb796f59c5b89b00cab7a4d0df68`. It preserves historical vendors and the dependency lock; 193 tests passed with one intentional composed skip, plus TypeScript/build and pin/tamper checks. This is component evidence, not real-browser or provider acceptance.
+
+This canonical checkout retains its previous candidate imports/historical runner.
+The prepared implementation is on a separate local branch, not integrated here.
+Current documentation describes both contexts without importing runtime changes.
+
+- [How: released defaults consumption](how/released-defaults-consumption.md)
+
+See the [root workspace authority](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/workspace-state.md) for exact source/release
+identities, preserved source snapshots and remaining gates. Documentation-only
+HEADs are not substitutions for frozen acceptance commits. Earlier dated
+checkpoints retain their historical evidence; no runtime suite was rerun for
+this prose refresh.
+
 Parent requirements in the ThoughtKhoral root `.ai/specs/` apply here. This project may diverge only through an accepted local decision record that identifies the overridden parent rule and its consequences.
 
 See the [root specification index](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/README.md).
 
 For the coordinated Codex conversation status across all projects, see the [shared status guide](https://github.com/thoughtkhoral/thought-khoral/blob/main/docs/codex-conversation-status.md).
 
-## Current verification scope — 2026-11-19
+<a id="current-verification-scope--2026-11-19"></a>
+
+## Historical verification scope — 2026-11-19
 
 See the [owning current checkpoint](how/codex-room-participation.md#current-ui-verification-scope--2026-11-19) for source publication and
 verification attribution. The integrated Codex candidate is pushed on `main`;
