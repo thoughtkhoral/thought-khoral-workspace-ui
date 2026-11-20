@@ -1,5 +1,18 @@
 # ThoughtKhoral workspace UI
 
+## Current workspace context — 2026-11-20
+
+Released-v1.1 defaults consumption is implemented and reviewed at local source `29a940012adfeb796f59c5b89b00cab7a4d0df68`. It preserves historical vendors and the dependency lock; 193 tests passed with one intentional composed skip, plus TypeScript/build and pin/tamper checks. This is component evidence, not real-browser or provider acceptance.
+
+This canonical checkout retains its previous candidate imports/historical runner.
+The prepared implementation is on a separate local branch, not integrated here.
+Current documentation describes both contexts without importing runtime changes.
+
+Derived from the [local specification index](.ai/specs/README.md) and
+[root workspace authority](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/workspace-state.md).
+The cited tests retain their original source identities; this documentation
+refresh adds no activation, publication or runtime acceptance.
+
 `thought-khoral-workspace-ui` is the React/Vite browser workspace for governed
 ThoughtKhoral rooms. It renders chat, active context, and human Confirm/Edit/
 Dismiss controls for draft decisions.
@@ -12,7 +25,8 @@ For the cross-project Codex conversation status and remaining gates, see the [sh
 
 The [current UI checkpoint](.ai/specs/how/codex-room-participation.md#current-ui-verification-scope--2026-11-19)
 records the integrated/pushed Codex/defaults candidate and its provider-free
-synthetic acceptance. The v1.1 contract remains unreleased. Task 9 opt-in
+synthetic acceptance. The v1.1 artifact is published; canonical versus prepared imports are
+distinguished in the current workspace context above. Task 9 opt-in
 packaged-stack, rendered-browser/Keycloak, live-provider and production/release
 acceptance remain open; separate native Linux worker results add no UI coverage.
 
