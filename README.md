@@ -1,5 +1,18 @@
 # ThoughtKhoral workspace UI
 
+## Current workspace context — 2026-11-20
+
+Released-v1.1 defaults consumption is implemented and reviewed at local source `29a940012adfeb796f59c5b89b00cab7a4d0df68`. It preserves historical vendors and the dependency lock; 193 tests passed with one intentional composed skip, plus TypeScript/build and pin/tamper checks. This is component evidence, not real-browser or provider acceptance.
+
+This is the prepared source branch: its released imports/profile are present.
+Its frozen implementation commit above remains the acceptance identity; later
+documentation commits are evidence followups. The branch remains unpushed/unmerged.
+
+Derived from the [local specification index](.ai/specs/README.md) and
+[root workspace authority](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/workspace-state.md).
+The cited tests retain their original source identities; this documentation
+refresh adds no activation, publication or runtime acceptance.
+
 The local released-defaults transition loads the resolved-settings schema from
 verified conversation v1.1.0 at source `f1c8621`. Pretest/prebuild verify its
 external release-lock anchor, all 156 payload files and tamper refusals while
@@ -20,7 +33,8 @@ For the cross-project Codex conversation status and remaining gates, see the [sh
 
 The [current UI checkpoint](.ai/specs/how/codex-room-participation.md#current-ui-verification-scope--2026-11-19)
 records the integrated/pushed Codex/defaults candidate and its provider-free
-synthetic acceptance. The v1.1 contract remains unreleased. Task 9 opt-in
+synthetic acceptance. The v1.1 artifact is published; canonical versus prepared imports are
+distinguished in the current workspace context above. Task 9 opt-in
 packaged-stack, rendered-browser/Keycloak, live-provider and production/release
 acceptance remain open; separate native Linux worker results add no UI coverage.
 
@@ -116,7 +130,10 @@ transcript once. Leaving clears the local conversation state and stops polling.
 The exact published profile is vendored under `contracts/agent-conversation-v1`.
 `npm run check:contracts` verifies its immutable lock and all 135 file hashes;
 `npm run test:contracts` exercises fixture, extra-file, and lock tampering in a
-temporary copy. The additive defaults schema is pinned as an **unreleased v1.1 candidate** under
+temporary copy. Production defaults validation uses the released vendor under
+`contracts/agent-conversation-v1.1`; `check:defaults-release` and
+`test:defaults-release` enforce its exact lock/payload and seven tamper cases.
+The historical **unreleased-candidate** vendor remains under
 `contracts/agent-conversation-v1.1-candidate`, from contracts commit
 `1ea828f28725ddaaefa21d083473f9abbd777975`. `npm run check:defaults-candidate`
 checks its external lock digest, all 156 payload hashes, and the unchanged
