@@ -1,5 +1,19 @@
 # Codex Room Participation — implementation design
 
+## Current workspace state — 2026-11-20
+
+Released-v1.1 defaults consumption is implemented and reviewed at local source `29a940012adfeb796f59c5b89b00cab7a4d0df68`. It preserves historical vendors and the dependency lock; 193 tests passed with one intentional composed skip, plus TypeScript/build and pin/tamper checks. This is component evidence, not real-browser or provider acceptance.
+
+This is the prepared source branch: its released imports/profile are present.
+Its frozen implementation commit above remains the acceptance identity; later
+documentation commits are evidence followups. The branch remains unpushed/unmerged.
+
+See the [root workspace authority](https://github.com/thoughtkhoral/thought-khoral/blob/main/.ai/specs/how/workspace-state.md) for exact source/release
+identities, preserved source snapshots and remaining gates. Documentation-only
+HEADs are not substitutions for frozen acceptance commits. Earlier dated
+checkpoints retain their historical evidence; no runtime suite was rerun for
+this prose refresh.
+
 ## Status
 
 Approved by the project maintainer in the Codex working session on 2026-10-05,
@@ -441,7 +455,9 @@ The reviewed UI candidate is pushed to GitHub `main` in
 passed with one intentional composed-test skip. Packaged-stack and separately
 authorized live verification remain open; this does not claim production readiness.
 
-## Current UI verification scope — 2026-11-19
+<a id="current-ui-verification-scope--2026-11-19"></a>
+
+## Historical UI verification scope — 2026-11-19
 
 The integrated UI/defaults candidate remains pushed on `main`; the reviewed
 runtime source and provider-free results are recorded in the 2026-10-07
