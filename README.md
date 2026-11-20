@@ -1,5 +1,7 @@
 # ThoughtKhoral workspace UI
 
+[Project documentation](docs/README.md) · [Documentation requirements](.ai/specs/what/public-documentation.md)
+
 ## Current workspace context — 2026-11-20
 
 Released-v1.1 defaults consumption is implemented and reviewed at local source `29a940012adfeb796f59c5b89b00cab7a4d0df68`. It preserves historical vendors and the dependency lock; 193 tests passed with one intentional composed skip, plus TypeScript/build and pin/tamper checks. This is component evidence, not real-browser or provider acceptance.
