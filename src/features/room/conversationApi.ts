@@ -4,7 +4,7 @@ import turnSchema from '../../../contracts/agent-conversation-v1/schemas/turn.sc
 import viewSchema from '../../../contracts/agent-conversation-v1/schemas/view.schema.json';
 import catalogSchema from '../../../contracts/agent-conversation-v1/schemas/catalog.schema.json';
 import errorSchema from '../../../contracts/agent-conversation-v1/schemas/error.schema.json';
-import resolvedSettingsSchema from '../../../contracts/agent-conversation-v1.1-candidate/schemas/agent-conversation-v1/resolved-settings.schema.json';
+import resolvedSettingsSchema from '../../../contracts/agent-conversation-v1.1/schemas/agent-conversation-v1/resolved-settings.schema.json';
 import type { ChatMention } from '../../api';
 import { mentionTokens } from './mentions';
 export const PROFILE_VERSION = 'thought-khoral.agent-conversation.v1' as const;

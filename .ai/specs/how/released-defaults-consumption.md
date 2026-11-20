@@ -53,3 +53,14 @@ identity-gate compatibility allows only the exact retained contractVersion
 field in ordinary-human-message.json and ordinary-codex-message.json beneath
 the new release vendor; it grants no broader path or legacy-name exception.
 Publication, merges, live activation and provider checks retain separate gates.
+
+## Local verification checkpoint — 2026-11-20
+
+Full UI suite: 193 passed and one intentionally skipped opt-in composed test. TypeScript and the production Vite build passed; the existing >500 kB chunk advisory remains. Exact released/candidate/v1.0 checks and seven release tamper cases passed.
+
+Independent code review found no actionable issue. All 156 release hashes
+match the published lock and historical candidate bytes; dependency locks
+and both historical vendor directories are unchanged. Root identity regression
+coverage verifies only the four exact compatibility fixture paths and rejects
+unapproved neighboring paths/fields. These results are local component evidence,
+not source publication, packaged-stack/browser verification or provider use.

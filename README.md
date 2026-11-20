@@ -1,5 +1,13 @@
 # ThoughtKhoral workspace UI
 
+The local released-defaults transition loads the resolved-settings schema from
+verified conversation v1.1.0 at source `f1c8621`. Pretest/prebuild verify its
+external release-lock anchor, all 156 payload files and tamper refusals while
+preserving the historical candidate and published v1.0 vendors. See the
+[owning specification](.ai/specs/how/released-defaults-consumption.md).
+This transition changes no controls or wire behavior and grants no live or
+packaged-browser acceptance.
+
 `thought-khoral-workspace-ui` is the React/Vite browser workspace for governed
 ThoughtKhoral rooms. It renders chat, active context, and human Confirm/Edit/
 Dismiss controls for draft decisions.

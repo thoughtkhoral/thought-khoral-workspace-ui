@@ -10,13 +10,15 @@
     "dev": "vite",
     "check:contracts": "node scripts/check-conversation-contract.mjs",
     "test:contracts": "node scripts/verify-conversation-contract-checker.mjs",
-    "prebuild": "npm run check:contracts && npm run check:defaults-candidate && npm run test:defaults-candidate",
+    "prebuild": "npm run check:contracts && npm run check:defaults-candidate && npm run test:defaults-candidate && npm run check:defaults-release && npm run test:defaults-release",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "pretest": "npm run check:contracts && npm run test:contracts && npm run check:defaults-candidate && npm run test:defaults-candidate",
+    "pretest": "npm run check:contracts && npm run test:contracts && npm run check:defaults-candidate && npm run test:defaults-candidate && npm run check:defaults-release && npm run test:defaults-release",
     "test:preview": "node static-preview-smoke.mjs && vitest run src/features/room/ChatStream.test.tsx",
     "check:defaults-candidate": "node scripts/check-default-settings-candidate.mjs",
-    "test:defaults-candidate": "node scripts/verify-default-settings-candidate-checker.mjs"
+    "test:defaults-candidate": "node scripts/verify-default-settings-candidate-checker.mjs",
+    "check:defaults-release": "node scripts/check-default-settings-release.mjs",
+    "test:defaults-release": "node scripts/verify-default-settings-release-checker.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "4.7.0",
