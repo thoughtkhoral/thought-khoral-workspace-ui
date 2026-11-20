@@ -20,6 +20,8 @@ publication. Local-only/unmerged wording applies to those historical checkpoints
 
 ## Local areas
 
+- [Approved How: released defaults contract consumption](how/released-defaults-consumption.md) — local v1.1 release transition; historical pins preserved.
+
 - [What: MVP workspace UI](what/mvp-ui.md)
 - [What: public documentation](what/public-documentation.md)
 - [How: implementation](how/implementation.md)
