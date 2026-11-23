@@ -4,9 +4,9 @@
 
 Released-v1.1 defaults consumption is implemented and reviewed at local source `29a940012adfeb796f59c5b89b00cab7a4d0df68`. It preserves historical vendors and the dependency lock; 193 tests passed with one intentional composed skip, plus TypeScript/build and pin/tamper checks. This is component evidence, not real-browser or provider acceptance.
 
-This is the prepared source branch: its released imports/profile are present.
-Its frozen implementation commit above remains the acceptance identity; later
-documentation commits are evidence followups. The branch remains unpushed/unmerged.
+This checkout contains the reviewed released-v1.1 implementation. The
+maintainer authorized coordinated integration on 2026-11-23. Frozen component
+acceptance commits remain unchanged; packaged/browser/live gates remain open.
 
 - [How: released defaults consumption](how/released-defaults-consumption.md)
 
